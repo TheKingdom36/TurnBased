@@ -25,7 +25,6 @@ function love.load()
 end
 
 function love.update(dt)
-   
     lurker.update()
     level:update(dt)
 end

@@ -1,6 +1,14 @@
 local Grid = require('game.Grid')
 local Player = require('game.Player')
-local Config = require('game.Config')
+local UI = require('game.UI')
+local TurnManager = require('game.TurnManager')
+local LevelState = require('game.LevelState')
+local FireBall = require('game.attacks.FireBall')
+local computeReachable = require('game.PathFindingUtils')
+
+if os.getenv("LOCAL_LUA_DEBUGGER_VSCODE") == "1" then
+    require("lldebugger").start()
+end
 
 local COST_COLORS = {
     [0] = { 0.8, 1.0, 0.8, 1 },        -- Free (light green)
@@ -12,33 +20,6 @@ local COST_COLORS = {
 
 local Level = {}
 Level.__index = Level
-
--- Dijkstra's algorithm to find all tiles within maxDistance cost
-local function computeReachable(grid, startCol, startRow, maxDist)
-    local result = {}
-    local visited = {}
-    local queue = { { col = startCol, row = startRow, cost = 0 } }
-    local key = function(c, r) return c .. ',' .. r end
-    while #queue > 0 do
-        local current = table.remove(queue, 1)
-        local k = key(current.col, current.row)
-        if not visited[k] then
-            visited[k] = true
-            local t = grid:getTile(current.col, current.row)
-            if t and t.cost < math.huge and current.cost <= maxDist then
-                table.insert(result, { col = current.col, row = current.row, cost = current.cost })
-                for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
-                    local nc, nr = current.col + d[1], current.row + d[2]
-                    local nt = grid:getTile(nc, nr)
-                    if nt and nt.cost < math.huge then
-                        table.insert(queue, { col = nc, row = nr, cost = current.cost + nt.cost })
-                    end
-                end
-            end
-        end
-    end
-    return result
-end
 
 function Level:new(cols, rows, tileSize)
     local level = setmetatable({}, self)
@@ -59,11 +40,40 @@ function Level:new(cols, rows, tileSize)
         pathLineAlpha = 0,
         selectedPlayer = nil,
         isAnimating = false,
+        selectedAttack = nil
     }
+
+    level.ui = UI:new()
+
     level.players = {}
     -- Place a player at (2,2)
     local player = Player:new(2, 2)
     table.insert(level.players, player)
+    local fireball = FireBall:new(player, level.grid)
+    table.insert(player.attacks,fireball)
+    local fireball = FireBall:new(player, level.grid)
+    table.insert(player.attacks, fireball)
+    local fireball = FireBall:new(player, level.grid)
+    table.insert(player.attacks, fireball)
+    local fireball = FireBall:new(player, level.grid)
+    table.insert(player.attacks, fireball)
+
+    -- Create Turn Manager
+    level.turnManager = TurnManager:new()
+    level.turnManager.onTurnStart = function ()
+        for index, value in ipairs(level.players) do
+            level.turnManager:addPlayer(value)
+            value.state = Player.State.WAITING
+            value.actionPointsRemaining = 2
+        end
+
+        level.levelState.turnNumber = level.levelState.turnNumber + 1
+    end
+
+    -- Create Game State
+    level.levelState = LevelState:new()
+    level.levelState.currentPlayer = player
+
     -- Randomize costs
     math.randomseed(os.time())
     for col = 1, level.config.cols do
@@ -78,22 +88,36 @@ function Level:new(cols, rows, tileSize)
             level.grid:setCost(col, row, cost)
         end
     end
+    
     return level
 end
 
 function Level:update(dt)
+
+    if #self.turnManager.players == 0  then
+        self.turnManager:onTurnStart()
+    end
+
+
+    if self.levelState.currentAttack then
+        self.grid:getTile(1,1).color = COST_COLORS[3]
+    end
+
+
     local mx, my = love.mouse.getPosition()
     self.grid:update(dt, mx, my)
     for _, player in ipairs(self.players) do
         player:update(dt)
-        if player.isMoving then
+        if player.state == Player.State.MOVING then
             self.selection.isAnimating = true
+        elseif player.state == Player.State.DONE then
+            self.turnManager:removePlayer(player)
         end
     end
     -- If no player is moving, allow input
     local anyMoving = false
     for _, player in ipairs(self.players) do
-        if player.isMoving then
+        if player.state == Player.State.MOVING then
             anyMoving = true
             break
         end
@@ -102,6 +126,8 @@ function Level:update(dt)
     if self.selection.pathLineAlpha > 0 then
         self.selection.pathLineAlpha = math.max(0, self.selection.pathLineAlpha - self.config.pathLineFadeSpeed * dt)
     end
+
+    self.ui:update(dt, self.levelState)
 end
 
 function Level:playerAt(col, row)
@@ -111,28 +137,6 @@ function Level:playerAt(col, row)
         end
     end
     return nil
-end
-
-function Level:getGridOffset()
-    local winW = love.graphics.getWidth()
-    local winH = love.graphics.getHeight()
-    local padX = winW * 0.2
-    local padY = winH * 0.2
-    local gridW = self.config.cols * self.config.tileSize
-    local gridH = self.config.rows * self.config.tileSize
-    local offsetX = (winW - gridW) / 2
-    local offsetY = (winH - gridH) / 2
-    -- Clamp to at least 20% padding
-    offsetX = math.max(offsetX, padX)
-    offsetY = math.max(offsetY, padY)
-    return offsetX, offsetY, gridW, gridH
-end
-
-function Level:gridToScreen(col, row)
-    local offsetX, offsetY = self:getGridOffset()
-    local x = offsetX + (col - 1) * self.config.tileSize
-    local y = offsetY + (row - 1) * self.config.tileSize
-    return x, y
 end
 
 function Level:resetSelection()
@@ -145,8 +149,11 @@ function Level:resetSelection()
 end
 
 function Level:mousepressed(x, y, button)
+
+    self.ui:mousepressed(x,y,button)
+
     if button == 1 and not self.selection.isAnimating then
-        local offsetX, offsetY = self:getGridOffset()
+        local offsetX, offsetY = self.grid:getGridOffset()
         local col = math.floor((x - offsetX) / self.config.tileSize) + 1
         local row = math.floor((y - offsetY) / self.config.tileSize) + 1
         if col >= 1 and col <= self.config.cols and row >= 1 and row <= self.config.rows then
@@ -175,7 +182,7 @@ function Level:mousepressed(x, y, button)
                     local path = self.grid:findPath(self.selection.first.col, self.selection.first.row,
                         self.selection.second.col, self.selection.second.row)
                     if path then
-                        self.selection.selectedPlayer:setPath(path)
+                        self.selection.selectedPlayer:setMove(path)
                         self.selection.isAnimating = true
                         self.selection.pathLine = path
                         self.selection.pathLineAlpha = 1
@@ -211,34 +218,23 @@ function Level:keypressed(key)
 end
 
 function Level:draw()
-    local offsetX, offsetY, gridW, gridH = self:getGridOffset()
-    -- Draw border
-    love.graphics.setColor(0.1, 0.1, 0.1, 1)
-    love.graphics.setLineWidth(6)
-    love.graphics.rectangle("line", offsetX - 3, offsetY - 3, gridW + 6, gridH + 6, 8, 8)
-    love.graphics.setLineWidth(1)
-    -- Draw grid tiles
-    for col = 1, self.config.cols do
-        for row = 1, self.config.rows do
-            local t = self.grid:getTile(col, row)
-            local x, y = self:gridToScreen(col, row)
-            local color = COST_COLORS[t.cost] or { 1, 1, 1, 1 }
-            love.graphics.setColor(color)
-            love.graphics.rectangle("fill", x, y, self.config.tileSize, self.config.tileSize)
-        end
-    end
+    local offsetX, offsetY = self.grid:getGridOffset()
+    
+
+    self.grid:draw()
+
     for _, tile in ipairs(self.selection.reachable) do
-        local x, y = self:gridToScreen(tile.col, tile.row)
+        local x, y = self.grid:gridToScreen(tile.col, tile.row)
         love.graphics.setColor(0.2, 1, 0.2, 0.4)
         love.graphics.rectangle("fill", x, y, self.config.tileSize, self.config.tileSize)
     end
     if self.selection.first.col and self.selection.first.row then
-        local x, y = self:gridToScreen(self.selection.first.col, self.selection.first.row)
+        local x, y = self.grid:gridToScreen(self.selection.first.col, self.selection.first.row)
         love.graphics.setColor(1, 1, 0, 0.5)
         love.graphics.rectangle("fill", x, y, self.config.tileSize, self.config.tileSize)
     end
     if self.selection.second.col and self.selection.second.row then
-        local x, y = self:gridToScreen(self.selection.second.col, self.selection.second.row)
+        local x, y = self.grid:gridToScreen(self.selection.second.col, self.selection.second.row)
         love.graphics.setColor(1, 0.5, 0, 0.5)
         love.graphics.rectangle("fill", x, y, self.config.tileSize, self.config.tileSize)
     end
@@ -247,8 +243,8 @@ function Level:draw()
         for i = 1, #self.selection.pathLine - 1 do
             local a = self.selection.pathLine[i]
             local b = self.selection.pathLine[i + 1]
-            local ax, ay = self:gridToScreen(a.col, a.row)
-            local bx, by = self:gridToScreen(b.col, b.row)
+            local ax, ay = self.grid:gridToScreen(a.col, a.row)
+            local bx, by = self.grid:gridToScreen(b.col, b.row)
             ax = ax + self.config.tileSize / 2
             ay = ay + self.config.tileSize / 2
             bx = bx + self.config.tileSize / 2
@@ -261,7 +257,7 @@ function Level:draw()
     for col = 1, self.config.cols do
         for row = 1, self.config.rows do
             local t = self.grid:getTile(col, row)
-            local x, y = self:gridToScreen(col, row)
+            local x, y = self.grid:gridToScreen(col, row)
             if t.hovered then
                 love.graphics.setColor(0.2, 0.8, 1, 0.4)
                 love.graphics.rectangle("fill", x, y, self.config.tileSize, self.config.tileSize)
@@ -282,7 +278,10 @@ function Level:draw()
     love.graphics.print("Max Distance: " .. tostring(self.config.maxDistance), 18, 18)
     love.graphics.setColor(1, 1, 1, 1)
     love.graphics.print("Click a player, then a tile in range to move. Use UP/DOWN or 1-9 to set max distance.", 10,
-        love.graphics.getHeight() - 32)
+    love.graphics.getHeight() - 32)
+
+    -- need to initate the game state object 
+    self.ui:draw(self.levelState, self.turnManager)
 end
 
 return Level

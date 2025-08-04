@@ -7,7 +7,6 @@ local Config = require('game.Config')
 function TurnManager:new()
     local manager = {
         players = {},
-        currentPlayerIndex = 1,
         turnTimer = 0,
         turnDuration = Config.TURN_DURATION,
         turnWarningTime = Config.TURN_WARNING_TIME,

@@ -2,13 +2,22 @@
 local Grid = {}
 Grid.__index = Grid
 
+local COST_COLORS = {
+    [0] = { 0.8, 1.0, 0.8, 1 },        -- Free (light green)
+    [1] = { 0.7, 0.7, 1.0, 1 },        -- Normal (light blue)
+    [2] = { 1.0, 1.0, 0.5, 1 },        -- Medium (yellow)
+    [3] = { 1.0, 0.6, 0.6, 1 },        -- High (red)
+    [math.huge] = { 0.2, 0.2, 0.2, 1 } -- Blocked (dark gray)
+}
+
 local function defaultTile()
     return {
         cost = 1,         -- Movement cost
         entity = nil,     -- Player/enemy reference
         hovered = false,  -- Is mouse over this tile?
         col = 1,
-        row = 1
+        row = 1,
+        color = nil
     }
 end
 
@@ -30,15 +39,6 @@ function Grid:new(cols, rows, tileSize)
     g.hoveredCol = nil
     g.hoveredRow = nil
     return g
-end
-
-function Grid:screenToGrid(x, y)
-    local col = math.floor(x / self.tileSize) + 1
-    local row = math.floor(y / self.tileSize) + 1
-    if col >= 1 and col <= self.cols and row >= 1 and row <= self.rows then
-        return col, row
-    end
-    return nil, nil
 end
 
 function Grid:getTile(col, row)
@@ -78,29 +78,57 @@ function Grid:update(dt, mouseX, mouseY)
 end
 
 function Grid:draw()
+
+    local offsetX, offsetY, gridW, gridH = self:getGridOffset()
+    -- Draw border
+    love.graphics.setColor(0.1, 0.1, 0.1, 1)
+    love.graphics.setLineWidth(6)
+    love.graphics.rectangle("line", offsetX - 3, offsetY - 3, gridW + 6, gridH + 6, 8, 8)
+    love.graphics.setLineWidth(1)
+
+
+    -- Draw grid tiles
     for col = 1, self.cols do
         for row = 1, self.rows do
-            local t = self.tiles[col][row]
-            local x = (col - 1) * self.tileSize
-            local y = (row - 1) * self.tileSize
-            -- Color by cost
-            local base = 0.2 + 0.2 * (t.cost - 1)
-            love.graphics.setColor(base, base, base, 1)
+            local t = self:getTile(col, row)
+            local x, y = self:gridToScreen(col, row)
+            local color = t.color or COST_COLORS[t.cost] or { 1, 1, 1, 1 }
+            love.graphics.setColor(color)
             love.graphics.rectangle("fill", x, y, self.tileSize, self.tileSize)
-            -- Hover glow
-            if t.hovered then
-                love.graphics.setColor(1, 0.8, 1, 0.4)
-                love.graphics.rectangle("fill", x, y, self.tileSize, self.tileSize)
-            end
-            -- Entity
-            if t.entity then
-                t.entity:draw(x + self.tileSize/2, y + self.tileSize/2, self.tileSize)
-            end
-            -- Border
-            love.graphics.setColor(0.4, 0.4, 0.4, 1)
-            love.graphics.rectangle("line", x, y, self.tileSize, self.tileSize)
         end
     end
+end
+
+function Grid:gridToScreen(col, row)
+    local offsetX, offsetY = self:getGridOffset()
+    local x = offsetX + (col - 1) * self.tileSize
+    local y = offsetY + (row - 1) * self.tileSize
+    return x, y
+end
+
+function Grid:screenToGrid(x, y)
+    local offsetX, offsetY = self:getGridOffset()
+    local col = math.floor((x - offsetX) / self.tileSize) + 1
+    local row = math.floor((y -offsetY) / self.tileSize) + 1
+    if col >= 1 and col <= self.cols and row >= 1 and row <= self.rows then
+        return col, row
+    end
+    return nil, nil
+end
+
+function Grid:getGridOffset()
+    local winW = love.graphics.getWidth()
+    local winH = love.graphics.getHeight()
+    local padX = winW * 0.2
+    local padY = winH * 0.2
+    local gridW = self.cols * self.tileSize
+    local gridH = self.rows * self.tileSize
+    local offsetX = (winW - gridW) / 2
+    local offsetY = (winH - gridH) / 2
+    -- Clamp to at least 20% padding
+    offsetX = math.max(offsetX, padX)
+    offsetY = math.max(offsetY, padY)
+    return offsetX, offsetY, gridW, gridH
 end
 
 -- A* pathfinding with cost

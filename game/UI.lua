@@ -1,3 +1,6 @@
+local EventSystem = require('game.EventSystem')
+local UIRightPanel = require('game.ScrollableBlock')
+
 -- UI System
 local UI = {}
 UI.__index = UI
@@ -7,7 +10,13 @@ local Config = require('game.Config')
 function UI:new()
     local ui = {
         font = love.graphics.newFont(Config.UI_FONT_SIZE),
-        buttons = {},
+        attackButtons = {},
+        attackButtonsConfig = {
+            rows = 2,
+            cols = 2,
+            width = 80,
+            height = 50 
+        },
         panels = {},
         tooltips = {},
         mouseX = 0,
@@ -18,17 +27,58 @@ function UI:new()
     -- Initialize UI elements
     ui:createActionPanel()
     ui:createInfoPanel()
+    self.rightPanel =  UIRightPanel:new(love.graphics.getWidth()-600,300,300,600,10)
+
+    -- Register a listener
+    EventSystem:register("log_action", function(message)
+        self.rightPanel:addLine(message)
+    end)
     
     return ui
 end
 
-function UI:update(dt)
+function UI:update(dt, levelState)
     -- Update mouse position
     self.mouseX, self.mouseY = love.mouse.getPosition()
+
     
+
+    -- In your update or keypressed function:
+    if love.keyboard.isDown("up") then
+        self.rightPanel:scroll(-20)
+    elseif love.keyboard.isDown("down") then
+        self.rightPanel:scroll(20)
+    end
+
+    if levelState.currentPlayer then
+        self:updateAttackButtons(levelState)
+    end
+
     -- Update buttons
-    for _, button in ipairs(self.buttons) do
+    for _, button in ipairs(self.attackButtons) do
         button.isHovered = self:isPointInRect(self.mouseX, self.mouseY, button.x, button.y, button.width, button.height)
+    end
+end
+
+function UI:updateAttackButtons(levelState)
+    if #levelState.currentPlayer.attacks == 0 then
+        return
+    end
+
+    local actionPanelPosX = self.actionPanel.x
+    local actionPanelPosY = self.actionPanel.y
+
+    local pos = 1
+    for i = 1, self.attackButtonsConfig.rows, 1 do
+        for j = 1, self.attackButtonsConfig.cols, 1 do
+            local button = levelState.currentPlayer.attacks[pos]
+            local x = actionPanelPosX + (i-1) * (self.attackButtonsConfig.width + 15)  + 10 
+            local y = actionPanelPosY + (j-1) * (self.attackButtonsConfig.height + 20) + 100
+
+            self:addAttackButton(button.name, x, y, self.attackButtonsConfig.width, self.attackButtonsConfig.height,  function()
+                levelState.currentAttack = levelState.currentPlayer.attacks[pos]
+            end  )
+        end
     end
 end
 
@@ -40,42 +90,19 @@ function UI:draw(gameState, turnManager)
     self:drawActionPanel(gameState, turnManager)
     self:drawInfoPanel(gameState, turnManager)
     self:drawTurnTimer(turnManager)
-    self:drawButtons()
+
+    self.rightPanel:draw()
 end
 
 function UI:createActionPanel()
     local panel = {
         x = 10,
-        y = love.graphics.getHeight() - 120,
+        y = love.graphics.getHeight() - 400,
         width = 200,
-        height = 110,
+        height = 300,
         title = "Actions"
     }
     self.actionPanel = panel
-    
-    -- Create action buttons
-    local buttonY = panel.y + 30
-    local buttonSpacing = 35
-    
-    self:addButton("Move", panel.x + 10, buttonY, 80, 25, function()
-        -- Move action
-        print("Move action selected")
-    end)
-    
-    self:addButton("Attack", panel.x + 100, buttonY, 80, 25, function()
-        -- Attack action
-        print("Attack action selected")
-    end)
-    
-    self:addButton("Defend", panel.x + 10, buttonY + buttonSpacing, 80, 25, function()
-        -- Defend action
-        print("Defend action selected")
-    end)
-    
-    self:addButton("Skip Turn", panel.x + 100, buttonY + buttonSpacing, 80, 25, function()
-        -- Skip turn
-        print("Turn skipped")
-    end)
 end
 
 function UI:createInfoPanel()
@@ -89,9 +116,9 @@ function UI:createInfoPanel()
     self.infoPanel = panel
 end
 
-function UI:drawActionPanel(gameState, turnManager)
+function UI:drawActionPanel(levelState, turnManager)
     local panel = self.actionPanel
-    
+   
     -- Draw panel background
     love.graphics.setColor(Config.COLORS.UI_BACKGROUND)
     love.graphics.rectangle("fill", panel.x, panel.y, panel.width, panel.height)
@@ -102,13 +129,21 @@ function UI:drawActionPanel(gameState, turnManager)
     
     -- Draw panel title
     love.graphics.setColor(Config.COLORS.UI_TEXT)
-    love.graphics.print(panel.title, panel.x + 5, panel.y + 5)
+    love.graphics.print(panel.title, panel.x + 5, panel.y + 25)
     
     -- Draw current player info
-    local currentPlayer = turnManager:getCurrentPlayer()
+    local currentPlayer = levelState.currentPlayer
     if currentPlayer then
-        love.graphics.print("Current: " .. currentPlayer.name, panel.x + 5, panel.y + 15)
+        love.graphics.print("Current: " .. currentPlayer.name, panel.x + 5, panel.y + 5)
     end
+
+    -- Draw current player info
+    local currentAttack = levelState.currentAttack
+    if currentAttack then
+        love.graphics.print("Current Attack: " .. currentAttack.name, panel.x + 5, panel.y + 25)
+    end
+
+    self:drawAttackButtons()
 end
 
 function UI:drawInfoPanel(gameState, turnManager)
@@ -132,12 +167,6 @@ function UI:drawInfoPanel(gameState, turnManager)
     y = y + 20
     love.graphics.print("Phase: " .. gameState:getGamePhase(), panel.x + 5, y)
     y = y + 20
-    
-    -- Draw scores
-    local scores = gameState:getScore()
-    love.graphics.print("Score P1: " .. scores.player1, panel.x + 5, y)
-    y = y + 20
-    love.graphics.print("Score P2: " .. scores.player2, panel.x + 5, y)
 end
 
 function UI:drawTurnTimer(turnManager)
@@ -171,21 +200,23 @@ function UI:drawTurnTimer(turnManager)
     love.graphics.print(string.format("Time: %.1f", timeRemaining), barX + barWidth/2 - 30, barY + 2)
 end
 
-function UI:addButton(text, x, y, width, height, callback)
+function UI:addAttackButton(text, x, y, width, height, callback)
     local button = {
-        text = text,
         x = x,
         y = y,
         width = width,
         height = height,
+        text = text,
         callback = callback,
         isHovered = false
     }
-    table.insert(self.buttons, button)
+
+    table.insert(self.attackButtons, button)
 end
 
-function UI:drawButtons()
-    for _, button in ipairs(self.buttons) do
+function UI:drawAttackButtons()
+
+    for index, button in ipairs(self.attackButtons) do
         -- Button background
         if button.isHovered then
             love.graphics.setColor(Config.COLORS.UI_BUTTON_HOVER)
@@ -193,11 +224,11 @@ function UI:drawButtons()
             love.graphics.setColor(Config.COLORS.UI_BUTTON)
         end
         love.graphics.rectangle("fill", button.x, button.y, button.width, button.height)
-        
+
         -- Button border
         love.graphics.setColor(1, 1, 1, 1)
         love.graphics.rectangle("line", button.x, button.y, button.width, button.height)
-        
+
         -- Button text
         love.graphics.setColor(Config.COLORS.UI_TEXT)
         local textWidth = self.font:getWidth(button.text)
@@ -213,7 +244,7 @@ end
 
 function UI:mousepressed(x, y, button)
     if button == 1 then -- Left click
-        for _, uiButton in ipairs(self.buttons) do
+        for _, uiButton in ipairs(self.attackButtons) do
             if self:isPointInRect(x, y, uiButton.x, uiButton.y, uiButton.width, uiButton.height) then
                 if uiButton.callback then
                     uiButton.callback()

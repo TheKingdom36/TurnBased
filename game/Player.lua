@@ -1,6 +1,16 @@
+local EventSystem = require('game.EventSystem')
 -- Player Class
 local Player = {}
 Player.__index = Player
+
+-- Enum for player states
+Player.State = {
+    MOVING = "moving",
+    WAITING = "waiting",
+    ATTACKING = "attacking",
+    DONE = "done",
+    DEAD = "dead"
+}
 
 function Player:new(col, row)
     local player = setmetatable({}, self)
@@ -12,19 +22,28 @@ function Player:new(col, row)
     player.pathStep = 1
     player.animTime = 0
     player.animSpeed = 0.15 -- seconds per tile
-    player.isMoving = false
+    player.state = Player.State.WAITING
+    player.actionPointsRemaining = 2
+    player.attacks = {}
+    player.name = "default"
     return player
 end
 
-function Player:setPath(path)
-    self.path = path
-    self.pathStep = 1
-    self.animTime = 0
-    self.isMoving = path and #path > 1
+function Player:setMove(path)
+
+    if path and #path > 1 then
+        self.state = Player.State.MOVING
+        self.path = path
+        self.pathStep = 1
+        self.animTime = 0
+        self.actionPointsRemaining = self.actionPointsRemaining - 1
+        EventSystem:emit("log_action", "I am moving")
+    end
+    
 end
 
 function Player:update(dt)
-    if self.isMoving and self.path then
+    if self.state == Player.State.MOVING and self.path then
         self.animTime = self.animTime + dt
         if self.animTime >= self.animSpeed then
             self.animTime = self.animTime - self.animSpeed
@@ -34,12 +53,14 @@ function Player:update(dt)
                 self.col = self.path[#self.path].col
                 self.row = self.path[#self.path].row
                 self.path = nil
-                self.isMoving = false
+                self.state = Player.State.WAITING
             else
                 self.col = self.path[self.pathStep].col
                 self.row = self.path[self.pathStep].row
             end
         end
+    elseif self.state == Player.State.WAITING and self.actionPointsRemaining <= 0 then
+        self.state = Player.State.DONE
     end
 end
 
