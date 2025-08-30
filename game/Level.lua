@@ -1,9 +1,6 @@
-local Grid = require('game.Grid')
 local Player = require('game.Player')
 local UI = require('game.UI')
 local TurnManager = require('game.TurnManager')
-local LevelState = require('game.LevelState')
-local FireBall = require('game.attacks.FireBall')
 local computeReachable = require('game.PathFindingUtils')
 
 if os.getenv("LOCAL_LUA_DEBUGGER_VSCODE") == "1" then
@@ -18,120 +15,77 @@ local COST_COLORS = {
     [math.huge] = { 0.2, 0.2, 0.2, 1 } -- Blocked (dark gray)
 }
 
+
 local Level = {}
 Level.__index = Level
 
-function Level:new(cols, rows, tileSize)
-    local level = setmetatable({}, self)
-    level.config = {
-        cols = cols or 16,
-        rows = rows or 12,
-        tileSize = tileSize or 48,
-        maxDistance = 8,
-        pathLineFadeTime = 2,
-    }
+---@param levelState LevelState
+function Level.create(levelState, config)
+    local level = setmetatable({}, Level)
+    level.levelState = levelState
+    level.config = config
     level.config.pathLineFadeSpeed = 1 / level.config.pathLineFadeTime
-    level.grid = Grid:new(level.config.cols, level.config.rows, level.config.tileSize)
-    level.selection = {
-        first = { col = nil, row = nil },
-        second = { col = nil, row = nil },
-        reachable = {},
-        pathLine = nil,
-        pathLineAlpha = 0,
-        selectedPlayer = nil,
-        isAnimating = false,
-        selectedAttack = nil
-    }
+
+    level.turnManager = TurnManager:new()
+    table.insert(level.turnManager.players, levelState.players)
+
+    level.turnManager.onTurnStart = function ()
+        
+    end
+
+    for index, player in ipairs(levelState.players) do
+        level.levelState.grid:getTile(player.col,player.row).entity = player
+    end
+
+    for index, enemy in ipairs(levelState.enemies) do
+        level.levelState.grid:getTile(enemy.col, enemy.row).entity = enemy
+    end
+
 
     level.ui = UI:new()
-
-    level.players = {}
-    -- Place a player at (2,2)
-    local player = Player:new(2, 2)
-    table.insert(level.players, player)
-    local fireball = FireBall:new(player, level.grid)
-    table.insert(player.attacks,fireball)
-    local fireball = FireBall:new(player, level.grid)
-    table.insert(player.attacks, fireball)
-    local fireball = FireBall:new(player, level.grid)
-    table.insert(player.attacks, fireball)
-    local fireball = FireBall:new(player, level.grid)
-    table.insert(player.attacks, fireball)
-
-    -- Create Turn Manager
-    level.turnManager = TurnManager:new()
-    level.turnManager.onTurnStart = function ()
-        for index, value in ipairs(level.players) do
-            level.turnManager:addPlayer(value)
-            value.state = Player.State.WAITING
-            value.actionPointsRemaining = 2
-        end
-
-        level.levelState.turnNumber = level.levelState.turnNumber + 1
-    end
-
-    -- Create Game State
-    level.levelState = LevelState:new()
-    level.levelState.currentPlayer = player
-
-    -- Randomize costs
-    math.randomseed(os.time())
-    for col = 1, level.config.cols do
-        for row = 1, level.config.rows do
-            local r = math.random()
-            local cost
-            if r < 0.05 then
-                cost = math.huge
-            else
-                cost = 1
-            end
-            level.grid:setCost(col, row, cost)
-        end
-    end
-    
+    -- You can add more setup here if needed
     return level
 end
 
 function Level:update(dt)
-
-    if #self.turnManager.players == 0  then
+    if #self.turnManager.players == 0 then
         self.turnManager:onTurnStart()
     end
 
-
     if self.levelState.currentAttack then
-        self.grid:getTile(1,1).color = COST_COLORS[3]
+        self.levelState.currentAttack:update(dt)
     end
 
+    self:handleCurrentSelectedAttack()
 
     local mx, my = love.mouse.getPosition()
-    self.grid:update(dt, mx, my)
-    for _, player in ipairs(self.players) do
+    self.levelState.grid:update(dt, mx, my)
+    for _, player in ipairs(self.levelState.players or {}) do
         player:update(dt)
-        if player.state == Player.State.MOVING then
-            self.selection.isAnimating = true
-        elseif player.state == Player.State.DONE then
+        if player.stats.state == Player.State.MOVING then
+            self.levelState.selection.isAnimating = true
+        elseif player.stats.state == Player.State.DONE then
             self.turnManager:removePlayer(player)
         end
     end
     -- If no player is moving, allow input
     local anyMoving = false
-    for _, player in ipairs(self.players) do
-        if player.state == Player.State.MOVING then
+    for _, player in ipairs(self.levelState.players or {}) do
+        if player.stats.state == Player.State.MOVING then
             anyMoving = true
             break
         end
     end
-    self.selection.isAnimating = anyMoving
-    if self.selection.pathLineAlpha > 0 then
-        self.selection.pathLineAlpha = math.max(0, self.selection.pathLineAlpha - self.config.pathLineFadeSpeed * dt)
+    self.levelState.selection.isAnimating = anyMoving
+    if self.levelState.selection.pathLineAlpha > 0 then
+        self.levelState.selection.pathLineAlpha = math.max(0,
+            self.levelState.selection.pathLineAlpha - self.config.pathLineFadeSpeed * dt)
     end
-
     self.ui:update(dt, self.levelState)
 end
 
 function Level:playerAt(col, row)
-    for _, player in ipairs(self.players) do
+    for _, player in ipairs(self.levelState.players or {}) do
         if player.col == col and player.row == row then
             return player
         end
@@ -140,65 +94,39 @@ function Level:playerAt(col, row)
 end
 
 function Level:resetSelection()
-    self.selection.selectedPlayer = nil
-    self.selection.first.col, self.selection.first.row = nil, nil
-    self.selection.second.col, self.selection.second.row = nil, nil
-    self.selection.reachable = {}
-    self.selection.pathLine = nil
-    self.selection.pathLineAlpha = 0
+    local sel = self.levelState.selection
+    sel.selectedPlayer = nil
+    sel.first.col, sel.first.row = nil, nil
+    sel.second.col, sel.second.row = nil, nil
+    sel.reachable = {}
+    sel.pathLine = nil
+    sel.pathLineAlpha = 0
+end
+
+function Level:resetAttackSelection()
+    self.levelState.currentAttack = nil
+    self.levelState.selection.attackReachable = {}
+    self.levelState.selection.attackLine = {}
 end
 
 function Level:mousepressed(x, y, button)
+    self.ui:mousepressed(x, y, button)
 
-    self.ui:mousepressed(x,y,button)
-
-    if button == 1 and not self.selection.isAnimating then
-        local offsetX, offsetY = self.grid:getGridOffset()
+    if button == 1 and not self.levelState.selection.isAnimating then
+        local offsetX, offsetY = self.levelState.grid:getGridOffset()
         local col = math.floor((x - offsetX) / self.config.tileSize) + 1
         local row = math.floor((y - offsetY) / self.config.tileSize) + 1
         if col >= 1 and col <= self.config.cols and row >= 1 and row <= self.config.rows then
-            local player = self:playerAt(col, row)
-            if not self.selection.selectedPlayer then
-                -- Only allow selection if a player is present
-                if player then
-                    self.selection.selectedPlayer = player
-                    self.selection.first.col, self.selection.first.row = col, row
-                    self.selection.reachable = computeReachable(self.grid, col, row, self.config.maxDistance)
-                    self.selection.second.col, self.selection.second.row = nil, nil
-                    self.selection.pathLine = nil
-                    self.selection.pathLineAlpha = 0
-                end
-            elseif not self.selection.second.col then
-                -- Only allow move if clicked tile is in range and not blocked
-                local inRange = false
-                for _, t in ipairs(self.selection.reachable) do
-                    if t.col == col and t.row == row then
-                        inRange = true
-                        break
-                    end
-                end
-                if inRange and not (col == self.selection.first.col and row == self.selection.first.row) then
-                    self.selection.second.col, self.selection.second.row = col, row
-                    local path = self.grid:findPath(self.selection.first.col, self.selection.first.row,
-                        self.selection.second.col, self.selection.second.row)
-                    if path then
-                        self.selection.selectedPlayer:setMove(path)
-                        self.selection.isAnimating = true
-                        self.selection.pathLine = path
-                        self.selection.pathLineAlpha = 1
-                    end
-                else
-                    self:resetSelection()
-                end
-            else
-                self:resetSelection()
-            end
+            self:handlePlayerSelection(col, row)
+            self:handleAttackSelection(row, col)
+        else
+            self:resetSelection()
         end
     end
 end
 
 function Level:keypressed(key)
-    if self.selection.isAnimating then return end
+    if self.levelState.selection.isAnimating then return end
     if key == "up" then
         self.config.maxDistance = self.config.maxDistance + 1
     elseif key == "down" then
@@ -206,45 +134,50 @@ function Level:keypressed(key)
     elseif tonumber(key) then
         self.config.maxDistance = tonumber(key)
     end
-    if self.selection.selectedPlayer then
-        self.selection.first.col = self.selection.selectedPlayer.col
-        self.selection.first.row = self.selection.selectedPlayer.row
-        self.selection.reachable = computeReachable(self.grid, self.selection.first.col, self.selection.first.row,
+    local sel = self.levelState.selection
+    if sel.selectedPlayer then
+        sel.first.col = sel.selectedPlayer.col
+        sel.first.row = sel.selectedPlayer.row
+        sel.reachable = computeReachable(self.levelState.grid, sel.first.col, sel.first.row,
             self.config.maxDistance)
-        self.selection.second.col, self.selection.second.row = nil, nil
-        self.selection.pathLine = nil
-        self.selection.pathLineAlpha = 0
+        sel.second.col, sel.second.row = nil, nil
+        sel.pathLine = nil
+        sel.pathLineAlpha = 0
     end
 end
 
 function Level:draw()
-    local offsetX, offsetY = self.grid:getGridOffset()
-    
+    local offsetX, offsetY = self.levelState.grid:getGridOffset()
 
-    self.grid:draw()
+    self.levelState.grid:draw()
 
-    for _, tile in ipairs(self.selection.reachable) do
-        local x, y = self.grid:gridToScreen(tile.col, tile.row)
+    if self.levelState.currentAttack then
+        self.levelState.currentAttack:draw()
+    end
+
+    local sel = self.levelState.selection
+    for _, tile in ipairs(sel.reachable) do
+        local x, y = self.levelState.grid:gridToScreen(tile.col, tile.row)
         love.graphics.setColor(0.2, 1, 0.2, 0.4)
         love.graphics.rectangle("fill", x, y, self.config.tileSize, self.config.tileSize)
     end
-    if self.selection.first.col and self.selection.first.row then
-        local x, y = self.grid:gridToScreen(self.selection.first.col, self.selection.first.row)
+    if sel.first.col and sel.first.row then
+        local x, y = self.levelState.grid:gridToScreen(sel.first.col, sel.first.row)
         love.graphics.setColor(1, 1, 0, 0.5)
         love.graphics.rectangle("fill", x, y, self.config.tileSize, self.config.tileSize)
     end
-    if self.selection.second.col and self.selection.second.row then
-        local x, y = self.grid:gridToScreen(self.selection.second.col, self.selection.second.row)
+    if sel.second.col and sel.second.row then
+        local x, y = self.levelState.grid:gridToScreen(sel.second.col, sel.second.row)
         love.graphics.setColor(1, 0.5, 0, 0.5)
         love.graphics.rectangle("fill", x, y, self.config.tileSize, self.config.tileSize)
     end
-    if self.selection.pathLine and self.selection.pathLineAlpha > 0 then
-        love.graphics.setColor(1, 0.2, 0.2, 0.7 * self.selection.pathLineAlpha)
-        for i = 1, #self.selection.pathLine - 1 do
-            local a = self.selection.pathLine[i]
-            local b = self.selection.pathLine[i + 1]
-            local ax, ay = self.grid:gridToScreen(a.col, a.row)
-            local bx, by = self.grid:gridToScreen(b.col, b.row)
+    if sel.pathLine and sel.pathLineAlpha > 0 then
+        love.graphics.setColor(1, 0.2, 0.2, 0.7 * sel.pathLineAlpha)
+        for i = 1, #sel.pathLine - 1 do
+            local a = sel.pathLine[i]
+            local b = sel.pathLine[i + 1]
+            local ax, ay = self.levelState.grid:gridToScreen(a.col, a.row)
+            local bx, by = self.levelState.grid:gridToScreen(b.col, b.row)
             ax = ax + self.config.tileSize / 2
             ay = ay + self.config.tileSize / 2
             bx = bx + self.config.tileSize / 2
@@ -254,22 +187,58 @@ function Level:draw()
         end
         love.graphics.setLineWidth(1)
     end
+
     for col = 1, self.config.cols do
         for row = 1, self.config.rows do
-            local t = self.grid:getTile(col, row)
-            local x, y = self.grid:gridToScreen(col, row)
+            local t = self.levelState.grid:getTile(col, row)
+            local x, y = self.levelState.grid:gridToScreen(col, row)
+            if t.highlightColor then
+                love.graphics.setColor(t.highlightColor)
+                love.graphics.rectangle("fill", x, y, self.config.tileSize, self.config.tileSize)
+            end
             if t.hovered then
                 love.graphics.setColor(0.2, 0.8, 1, 0.4)
                 love.graphics.rectangle("fill", x, y, self.config.tileSize, self.config.tileSize)
             end
             love.graphics.setColor(0.4, 0.4, 0.4, 1)
             love.graphics.rectangle("line", x, y, self.config.tileSize, self.config.tileSize)
+            t.highlightColor = nil -- Reset highlight after drawing
         end
     end
+
+    -- Draw enemies
+    for _, enemy in ipairs(self.levelState.enemies or {}) do
+        enemy:draw(self.config.tileSize, offsetX, offsetY)
+    end
     -- Draw players
-    for _, player in ipairs(self.players) do
+    for _, player in ipairs(self.levelState.players or {}) do
         player:draw(self.config.tileSize, offsetX, offsetY)
     end
+
+    if sel.attackLine and #sel.attackLine > 0 and sel.attackLineAlpha > 0 then
+        love.graphics.setColor(1, 0.2, 0.2, 0.7 * sel.attackLineAlpha)
+        for i = 1, #sel.attackLine - 1 do
+            local a = sel.attackLine[i]
+            local b = sel.attackLine[i + 1]
+            local ax, ay = self.levelState.grid:gridToScreen(a.col, a.row)
+            local bx, by = self.levelState.grid:gridToScreen(b.col, b.row)
+            ax = ax + self.config.tileSize / 2
+            ay = ay + self.config.tileSize / 2
+            bx = bx + self.config.tileSize / 2
+            by = by + self.config.tileSize / 2
+            love.graphics.setLineWidth(6)
+            love.graphics.line(ax, ay, bx, by)
+        end
+
+        local final = sel.attackLine[#sel.attackLine]
+        local finalx, finaly = self.levelState.grid:gridToScreen(final.col, final.row)
+        finalx = finalx + self.config.tileSize / 2
+        finaly = finaly + self.config.tileSize / 2
+        love.graphics.circle("fill", finalx, finaly, 10, 100)
+
+        love.graphics.setLineWidth(1)
+    end
+
     -- UI box and help text (keep at top left and bottom)
     love.graphics.setColor(0, 0, 0, 0.7)
     love.graphics.rectangle("fill", 10, 10, 180, 32, 6, 6)
@@ -278,10 +247,133 @@ function Level:draw()
     love.graphics.print("Max Distance: " .. tostring(self.config.maxDistance), 18, 18)
     love.graphics.setColor(1, 1, 1, 1)
     love.graphics.print("Click a player, then a tile in range to move. Use UP/DOWN or 1-9 to set max distance.", 10,
-    love.graphics.getHeight() - 32)
+        love.graphics.getHeight() - 32)
 
-    -- need to initate the game state object 
+    -- need to initate the game state object
     self.ui:draw(self.levelState, self.turnManager)
+end
+
+function Level:handlePlayerSelection(col, row)
+    local player = self:playerAt(col, row)
+    local sel = self.levelState.selection
+    if not sel.selectedPlayer then
+        -- Only allow selection if a player is present
+        if player then
+            sel.selectedPlayer = player
+            sel.first.col, sel.first.row = col, row
+            sel.reachable = computeReachable(self.levelState.grid, col, row, self.config.maxDistance)
+            sel.second.col, sel.second.row = nil, nil
+            sel.pathLine = nil
+            sel.pathLineAlpha = 0
+        end
+    elseif not sel.second.col then
+        -- Only allow move if clicked tile is in range and not blocked
+        local inRange = false
+        for _, t in ipairs(sel.reachable) do
+            if t.col == col and t.row == row then
+                inRange = true
+                break
+            end
+        end
+        if inRange and not (col == sel.first.col and row == sel.first.row) then
+            sel.second.col, sel.second.row = col, row
+            local path = self.levelState.grid:findPath(sel.first.col, sel.first.row,
+                sel.second.col, sel.second.row)
+            if path then
+                self.levelState.grid:getTile(sel.selectedPlayer.col, sel.selectedPlayer.row).entity = nil
+                self.levelState.grid:getTile(col,row).entity = sel.selectedPlayer
+                sel.selectedPlayer:setMove(path, col, row)
+                sel.isAnimating = true
+                sel.pathLine = path
+                sel.pathLineAlpha = 1
+            end
+        else
+            self:resetSelection()
+        end
+    else
+        self:resetSelection()
+    end
+end
+
+function Level:handleAttackSelection(row, col)
+    -- check if click is within the bounds of one of the attack highlighted cells
+    local sel = self.levelState.selection
+    if self.levelState.currentAttack then
+        local found = false
+        for _, value in ipairs(sel.attackReachable) do
+            if row == value.row and col == value.col then
+                self.levelState.currentAttack:cast(value.col, value.row, value.dir, function() self:resetAttackSelection() end)
+                self.levelState.selection.attackReachable = {}
+                self.levelState.selection.attackLine = {}
+                found = true
+                break
+            end
+        end
+        if not found then
+            -- No matching reachable tile, reset attack selection or give feedback
+            self:resetAttackSelection()
+        end
+    else
+        self:resetAttackSelection()
+    end
+end
+
+function Level:handleCurrentSelectedAttack()
+    if self.levelState.currentAttack and not self.levelState.currentAttack:isAnimating() then
+        local attack                              = self.levelState.currentAttack
+        local player                              = self.levelState.currentPlayer
+
+        local shape                               = attack:getLaunchShape()
+
+        self.levelState.selection.attackReachable = {}
+
+        local outerSelf                           = self
+        for index, dir in ipairs(shape) do
+            local col = player.col + dir.col
+            local row = player.row + dir.row
+
+            if self:isInBounds(col, row) then
+                local tile = self.levelState.grid:getTile(col, row)
+                if tile.cost < math.huge then
+                    table.insert(self.levelState.selection.attackReachable, { col = col, row = row, dir = dir })
+                    self.levelState.grid:getTile(col, row).highlightColor = COST_COLORS[3]
+
+                    self.levelState.grid:getTile(col, row).onHover = function()
+                        local pcol = col
+                        local prow = row
+
+                        self.levelState.selection.attackLine = {}
+
+                        table.insert(outerSelf.levelState.selection.attackLine,
+                            outerSelf.levelState.grid:getTile(player.col, player.row))
+
+                        while outerSelf:isInBounds(pcol, prow)
+                            and outerSelf.levelState.grid:getTile(pcol, prow).cost < math.huge
+                            and outerSelf.levelState.grid:getTile(pcol, prow).entity == nil do
+                            table.insert(outerSelf.levelState.selection.attackLine,
+                                outerSelf.levelState.grid:getTile(pcol, prow))
+                            pcol = pcol + dir.col
+                            prow = prow + dir.row
+                        end
+                        table.insert(outerSelf.levelState.selection.attackLine,
+                            outerSelf.levelState.grid:getTile(pcol, prow))
+                    end
+                end
+            end
+        end
+    else
+        -- Clear all onHover functions when no attack is selected
+        for col = 1, self.config.cols do
+            for row = 1, self.config.rows do
+                local tile = self.levelState.grid:getTile(col, row)
+                tile.onHover = nil
+            end
+        end
+    end
+end 
+
+function Level:isInBounds(col, row)
+    return col >= 1 and col <= self.config.cols and row >= 1 and row <= self.config.rows
 end
 
 return Level

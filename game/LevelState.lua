@@ -1,3 +1,4 @@
+local LevelState = {}
 -- Game State Manager
 local LevelState = {}
 LevelState.__index = LevelState
@@ -5,18 +6,60 @@ LevelState.__index = LevelState
 local Config = require('game.Config')
 
 -- Enum for turn phases
-LevelState.Phase = {
+Phase = {
     TURN_START = "turn_start",
     TURN_END = "turn_end",
     PLAYER_TURN = "player_turn",
     ENEMY_TURN = "enemy_turn"
 }
 
+---@class LevelSelection
+---@field first table
+---@field second table
+---@field reachable table[]
+---@field pathLine table[]|nil
+---@field pathLineAlpha number
+---@field selectedPlayer Player|nil
+---@field isAnimating boolean
+---@field selectedAttack any
+---@field attackReachable table[]
+---@field attackLine table[]|nil
+---@field attackLineAlpha number
+
+---@class LevelState
+---@field grid Grid
+---@field players Player[]
+---@field enemies Enemy[]
+---@field selection table
+---@field currentPlayer Player
+---@field currentAttack any
+---@field gamePhase string
+---@field turnNumber integer
+---@field Phase table
+local LevelState = {}
+
 function LevelState:new()
     local state = {
+        grid = nil,   -- The game grid
+        players = {}, -- List of player objects
+        enemies = {}, -- List of enemy objects
+        ---@type LevelSelection
+        selection = {
+            first = { col = nil, row = nil },
+            second = { col = nil, row = nil },
+            reachable = {},
+            pathLine = nil,
+            pathLineAlpha = 0,
+            selectedPlayer = nil,
+            isAnimating = false,
+            selectedAttack = nil,
+            attackReachable = {},
+            attackLine = nil,
+            attackLineAlpha = 2
+        },
         currentPlayer = nil,
         currentAttack = nil,
-        gamePhase = LevelState.Phase.TURN_START,
+        gamePhase = Phase.TURN_START,
         turnNumber = 1,
     }
     setmetatable(state, self)
@@ -57,4 +100,4 @@ function LevelState:reset()
     self.turnNumber = 1
 end
 
-return LevelState 
+return LevelState

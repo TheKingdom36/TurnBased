@@ -3,6 +3,8 @@
 local lurker = require("game.lurker")
 local Level = require('game.Level')
 
+
+local sampleLevel = require('levels.basic_sample_level')
 local level
 STARTED = STARTED or false
 
@@ -17,7 +19,17 @@ function love.load()
         STARTED = true
     end
 
-    level = Level:new(16, 12, 48)
+    local config    = {
+            cols = 18,
+            rows = 14,
+            tileSize = 48,
+            maxDistance = 8,
+            pathLineFadeTime = 2,
+    }
+
+    local state = sampleLevel(config)
+    
+    level = Level.create(state, config)
 
     lurker.postswap = function(file)
         love.load()

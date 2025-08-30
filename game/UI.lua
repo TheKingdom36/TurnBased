@@ -15,7 +15,7 @@ function UI:new()
             rows = 2,
             cols = 2,
             width = 80,
-            height = 50 
+            height = 50
         },
         panels = {},
         tooltips = {},
@@ -23,25 +23,23 @@ function UI:new()
         mouseY = 0
     }
     setmetatable(ui, self)
-    
+
     -- Initialize UI elements
     ui:createActionPanel()
     ui:createInfoPanel()
-    self.rightPanel =  UIRightPanel:new(love.graphics.getWidth()-600,300,300,600,10)
+    self.rightPanel = UIRightPanel:new(love.graphics.getWidth() - 600, 300, 300, 600, 10)
 
     -- Register a listener
     EventSystem:register("log_action", function(message)
         self.rightPanel:addLine(message)
     end)
-    
+
     return ui
 end
 
 function UI:update(dt, levelState)
     -- Update mouse position
     self.mouseX, self.mouseY = love.mouse.getPosition()
-
-    
 
     -- In your update or keypressed function:
     if love.keyboard.isDown("up") then
@@ -72,12 +70,13 @@ function UI:updateAttackButtons(levelState)
     for i = 1, self.attackButtonsConfig.rows, 1 do
         for j = 1, self.attackButtonsConfig.cols, 1 do
             local button = levelState.currentPlayer.attacks[pos]
-            local x = actionPanelPosX + (i-1) * (self.attackButtonsConfig.width + 15)  + 10 
-            local y = actionPanelPosY + (j-1) * (self.attackButtonsConfig.height + 20) + 100
+            local x = actionPanelPosX + (i - 1) * (self.attackButtonsConfig.width + 15) + 10
+            local y = actionPanelPosY + (j - 1) * (self.attackButtonsConfig.height + 20) + 100
 
-            self:addAttackButton(button.name, x, y, self.attackButtonsConfig.width, self.attackButtonsConfig.height,  function()
-                levelState.currentAttack = levelState.currentPlayer.attacks[pos]
-            end  )
+            self:addAttackButton(button.name, x, y, self.attackButtonsConfig.width, self.attackButtonsConfig.height,
+                function()
+                    levelState.currentAttack = levelState.currentPlayer.attacks[pos]
+                end)
         end
     end
 end
@@ -85,7 +84,7 @@ end
 function UI:draw(gameState, turnManager)
     -- Set font
     love.graphics.setFont(self.font)
-    
+
     -- Draw panels
     self:drawActionPanel(gameState, turnManager)
     self:drawInfoPanel(gameState, turnManager)
@@ -118,19 +117,19 @@ end
 
 function UI:drawActionPanel(levelState, turnManager)
     local panel = self.actionPanel
-   
+
     -- Draw panel background
     love.graphics.setColor(Config.COLORS.UI_BACKGROUND)
     love.graphics.rectangle("fill", panel.x, panel.y, panel.width, panel.height)
-    
+
     -- Draw panel border
     love.graphics.setColor(1, 1, 1, 1)
     love.graphics.rectangle("line", panel.x, panel.y, panel.width, panel.height)
-    
+
     -- Draw panel title
     love.graphics.setColor(Config.COLORS.UI_TEXT)
     love.graphics.print(panel.title, panel.x + 5, panel.y + 25)
-    
+
     -- Draw current player info
     local currentPlayer = levelState.currentPlayer
     if currentPlayer then
@@ -148,56 +147,56 @@ end
 
 function UI:drawInfoPanel(gameState, turnManager)
     local panel = self.infoPanel
-    
+
     -- Draw panel background
     love.graphics.setColor(Config.COLORS.UI_BACKGROUND)
     love.graphics.rectangle("fill", panel.x, panel.y, panel.width, panel.height)
-    
+
     -- Draw panel border
     love.graphics.setColor(1, 1, 1, 1)
     love.graphics.rectangle("line", panel.x, panel.y, panel.width, panel.height)
-    
+
     -- Draw panel title
     love.graphics.setColor(Config.COLORS.UI_TEXT)
     love.graphics.print(panel.title, panel.x + 5, panel.y + 5)
-    
+
     -- Draw game info
     local y = panel.y + 25
-    love.graphics.print("Turn: " .. gameState:getTurnNumber(), panel.x + 5, y)
+    --love.graphics.print("Turn: " .. turnManager:getTurnNumber(), panel.x + 5, y)
     y = y + 20
-    love.graphics.print("Phase: " .. gameState:getGamePhase(), panel.x + 5, y)
+    --love.graphics.print("Phase: " .. turnManager:getGamePhase(), panel.x + 5, y)
     y = y + 20
 end
 
 function UI:drawTurnTimer(turnManager)
     local timeRemaining = turnManager:getTurnTimeRemaining()
     local progress = turnManager:getTurnProgress()
-    
+
     -- Draw timer bar
     local barX = 220
     local barY = 10
     local barWidth = 300
     local barHeight = 20
-    
+
     -- Background
     love.graphics.setColor(0.3, 0.3, 0.3, 1)
     love.graphics.rectangle("fill", barX, barY, barWidth, barHeight)
-    
+
     -- Progress
-    local color = {0.2, 0.8, 0.2, 1}
+    local color = { 0.2, 0.8, 0.2, 1 }
     if turnManager:isTurnWarning() then
-        color = {0.8, 0.2, 0.2, 1}
+        color = { 0.8, 0.2, 0.2, 1 }
     end
     love.graphics.setColor(color)
     love.graphics.rectangle("fill", barX, barY, barWidth * progress, barHeight)
-    
+
     -- Border
     love.graphics.setColor(1, 1, 1, 1)
     love.graphics.rectangle("line", barX, barY, barWidth, barHeight)
-    
+
     -- Time text
     love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.print(string.format("Time: %.1f", timeRemaining), barX + barWidth/2 - 30, barY + 2)
+    love.graphics.print(string.format("Time: %.1f", timeRemaining), barX + barWidth / 2 - 30, barY + 2)
 end
 
 function UI:addAttackButton(text, x, y, width, height, callback)
@@ -215,7 +214,6 @@ function UI:addAttackButton(text, x, y, width, height, callback)
 end
 
 function UI:drawAttackButtons()
-
     for index, button in ipairs(self.attackButtons) do
         -- Button background
         if button.isHovered then
@@ -255,4 +253,4 @@ function UI:mousepressed(x, y, button)
     end
 end
 
-return UI 
+return UI

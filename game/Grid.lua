@@ -1,3 +1,4 @@
+---@class Grid
 -- Grid System for Prototyping
 local Grid = {}
 Grid.__index = Grid
@@ -12,16 +13,18 @@ local COST_COLORS = {
 
 local function defaultTile()
     return {
-        cost = 1,         -- Movement cost
-        entity = nil,     -- Player/enemy reference
-        hovered = false,  -- Is mouse over this tile?
+        cost = 1,        -- Movement cost
+        entity = nil,    -- Player/enemy reference
+        hovered = false, -- Is mouse over this tile?
         col = 1,
         row = 1,
-        color = nil
+        color = nil,
+        onHover = nil
     }
 end
 
 function Grid:new(cols, rows, tileSize)
+    ---@class Grid
     local g = setmetatable({}, self)
     g.cols = cols
     g.rows = rows
@@ -71,6 +74,9 @@ function Grid:update(dt, mouseX, mouseY)
         if t then t.hovered = true end
         self.hoveredCol = col
         self.hoveredRow = row
+        if t.onHover then
+            t.onHover()
+        end
     else
         self.hoveredCol = nil
         self.hoveredRow = nil
@@ -78,7 +84,6 @@ function Grid:update(dt, mouseX, mouseY)
 end
 
 function Grid:draw()
-
     local offsetX, offsetY, gridW, gridH = self:getGridOffset()
     -- Draw border
     love.graphics.setColor(0.1, 0.1, 0.1, 1)
@@ -95,6 +100,7 @@ function Grid:draw()
             local color = t.color or COST_COLORS[t.cost] or { 1, 1, 1, 1 }
             love.graphics.setColor(color)
             love.graphics.rectangle("fill", x, y, self.tileSize, self.tileSize)
+            t.color = nil
         end
     end
 end
@@ -109,7 +115,7 @@ end
 function Grid:screenToGrid(x, y)
     local offsetX, offsetY = self:getGridOffset()
     local col = math.floor((x - offsetX) / self.tileSize) + 1
-    local row = math.floor((y -offsetY) / self.tileSize) + 1
+    local row = math.floor((y - offsetY) / self.tileSize) + 1
     if col >= 1 and col <= self.cols and row >= 1 and row <= self.rows then
         return col, row
     end
@@ -145,7 +151,7 @@ function Grid:findPath(startCol, startRow, endCol, endRow)
     local startK = key(startCol, startRow)
     gScore[startK] = 0
     fScore[startK] = heuristic(startCol, startRow, endCol, endRow)
-    table.insert(open, {col = startCol, row = startRow})
+    table.insert(open, { col = startCol, row = startRow })
     while #open > 0 do
         -- Find node with lowest fScore
         local bestIdx = 1
@@ -160,17 +166,17 @@ function Grid:findPath(startCol, startRow, endCol, endRow)
         local ckey = key(current.col, current.row)
         if current.col == endCol and current.row == endRow then
             -- Reconstruct path
-            local path = {{col = endCol, row = endRow}}
+            local path = { { col = endCol, row = endRow } }
             while cameFrom[ckey] do
                 local prev = cameFrom[ckey]
-                table.insert(path, 1, {col = prev.col, row = prev.row})
+                table.insert(path, 1, { col = prev.col, row = prev.row })
                 ckey = key(prev.col, prev.row)
             end
             return path
         end
         closed[ckey] = true
         -- Neighbors
-        for _, d in ipairs({{1,0},{-1,0},{0,1},{0,-1}}) do
+        for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
             local nc, nr = current.col + d[1], current.row + d[2]
             local nkey = key(nc, nr)
             local tile = self:getTile(nc, nr)
@@ -178,14 +184,17 @@ function Grid:findPath(startCol, startRow, endCol, endRow)
                 local cost = tile.cost or 1
                 local tentativeG = (gScore[ckey] or math.huge) + cost
                 if not gScore[nkey] or tentativeG < gScore[nkey] then
-                    cameFrom[nkey] = {col = current.col, row = current.row}
+                    cameFrom[nkey] = { col = current.col, row = current.row }
                     gScore[nkey] = tentativeG
                     fScore[nkey] = tentativeG + heuristic(nc, nr, endCol, endRow)
                     local inOpen = false
                     for _, o in ipairs(open) do
-                        if o.col == nc and o.row == nr then inOpen = true break end
+                        if o.col == nc and o.row == nr then
+                            inOpen = true
+                            break
+                        end
                     end
-                    if not inOpen then table.insert(open, {col = nc, row = nr}) end
+                    if not inOpen then table.insert(open, { col = nc, row = nr }) end
                 end
             end
         end
@@ -193,4 +202,4 @@ function Grid:findPath(startCol, startRow, endCol, endRow)
     return nil -- No path
 end
 
-return Grid 
+return Grid
