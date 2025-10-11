@@ -2,6 +2,7 @@ local Player = require('game.Player')
 local UI = require('game.UI')
 local TurnManager = require('game.TurnManager')
 local computeReachable = require('game.PathFindingUtils')
+local EventSystem = require('game.EventSystem')
 
 if os.getenv("LOCAL_LUA_DEBUGGER_VSCODE") == "1" then
     require("lldebugger").start()
@@ -20,7 +21,26 @@ local Level = {}
 Level.__index = Level
 
 ---@param levelState LevelState
-function Level.create(levelState, config)
+function Level:create(levelState, config)
+    -- Anonymous function to find and delete an entity by name
+    local findAndDeleteByName = function(name)
+        for i, player in ipairs(levelState.players or {}) do
+            if player.name == name then
+                table.remove(levelState.players, i)
+                levelState.grid:getTile(player.col, player.row).entity = nil
+                return player
+            end
+        end
+        for i, enemy in ipairs(levelState.enemies or {}) do
+            if enemy.name == name then
+                table.remove(levelState.enemies, i)
+                levelState.grid:getTile(enemy.col, enemy.row).entity = nil
+                return enemy
+            end
+        end
+        return nil
+    end
+
     local level = setmetatable({}, Level)
     level.levelState = levelState
     level.config = config
@@ -28,22 +48,31 @@ function Level.create(levelState, config)
 
     level.turnManager = TurnManager:new()
     table.insert(level.turnManager.players, levelState.players)
+    table.insert(level.turnManager, levelState.players)
 
-    level.turnManager.onTurnStart = function ()
-        
+
+    EventSystem:register("death", findAndDeleteByName)
+
+    level.turnManager.onTurnStart = function()
+        for index, player in ipairs(levelState.players) do
+            level.levelState.grid:getTile(player.col, player.row).entity = player
+        end
+
+        for index, enemy in ipairs(levelState.enemies) do
+            level.levelState.grid:getTile(enemy.col, enemy.row).entity = enemy
+        end
     end
 
     for index, player in ipairs(levelState.players) do
-        level.levelState.grid:getTile(player.col,player.row).entity = player
+        level.levelState.grid:getTile(player.col, player.row).entity = player
     end
 
     for index, enemy in ipairs(levelState.enemies) do
         level.levelState.grid:getTile(enemy.col, enemy.row).entity = enemy
     end
 
-
     level.ui = UI:new()
-    -- You can add more setup here if needed
+
     return level
 end
 
@@ -57,6 +86,11 @@ function Level:update(dt)
     end
 
     self:handleCurrentSelectedAttack()
+
+    -- Draw enemies
+    for _, enemy in ipairs(self.levelState.enemies or {}) do
+        enemy:update(dt)
+    end
 
     local mx, my = love.mouse.getPosition()
     self.levelState.grid:update(dt, mx, my)
@@ -81,6 +115,20 @@ function Level:update(dt)
         self.levelState.selection.pathLineAlpha = math.max(0,
             self.levelState.selection.pathLineAlpha - self.config.pathLineFadeSpeed * dt)
     end
+
+    local gx, gy = self.levelState.grid:screenToGrid(mx, my)
+    if gx ~= nil and gy ~= nil and self:isInBounds(gx, gy) then
+        local entity = self:entityAt(gx,gy)
+        if entity then
+            self.levelState.selection.hoveredEntity = entity
+        else
+            self.levelState.selection.hoveredEntity = nil
+        end
+    else 
+        self.levelState.selection.hoveredEntity = nil
+    end
+
+
     self.ui:update(dt, self.levelState)
 end
 
@@ -90,6 +138,28 @@ function Level:playerAt(col, row)
             return player
         end
     end
+    return nil
+end
+
+function Level:entityAt(col, row)
+    for _, enemy in ipairs(self.levelState.enemies or {}) do
+        if enemy.col == col and enemy.row == row then
+            return enemy
+        end
+    end
+
+    for _, entity in ipairs(self.levelState.entities or {}) do
+        if entity.col == col and entity.row == row then
+            return entity
+        end
+    end
+
+    for _, player in ipairs(self.levelState.players or {}) do
+        if player.col == col and player.row == row then
+            return player
+        end
+    end
+
     return nil
 end
 
@@ -115,7 +185,7 @@ function Level:mousepressed(x, y, button)
     if button == 1 and not self.levelState.selection.isAnimating then
         local offsetX, offsetY = self.levelState.grid:getGridOffset()
         local col = math.floor((x - offsetX) / self.config.tileSize) + 1
-        local row = math.floor((y - offsetY) / self.config.tileSize) + 1
+        local row = 14 - math.floor((y - offsetY) / self.config.tileSize)
         if col >= 1 and col <= self.config.cols and row >= 1 and row <= self.config.rows then
             self:handlePlayerSelection(col, row)
             self:handleAttackSelection(row, col)
@@ -150,6 +220,14 @@ function Level:draw()
     local offsetX, offsetY = self.levelState.grid:getGridOffset()
 
     self.levelState.grid:draw()
+
+    -- Print mouse selection col and row
+    local mx, my = love.mouse.getPosition()
+    local col, row = self.levelState.grid:screenToGrid(mx, my)
+    if col and row and love.mouse.isDown(1) then
+        love.graphics.setColor(1, 1, 1, 1)
+        love.graphics.print(string.format("Mouse Grid: %d, %d", col, row), 20, 10)
+    end
 
     if self.levelState.currentAttack then
         self.levelState.currentAttack:draw()
@@ -253,6 +331,10 @@ function Level:draw()
     self.ui:draw(self.levelState, self.turnManager)
 end
 
+function Level:handleEntitySelection(col, row)
+    local entity = self:entityAt(col, row)
+end
+
 function Level:handlePlayerSelection(col, row)
     local player = self:playerAt(col, row)
     local sel = self.levelState.selection
@@ -281,7 +363,7 @@ function Level:handlePlayerSelection(col, row)
                 sel.second.col, sel.second.row)
             if path then
                 self.levelState.grid:getTile(sel.selectedPlayer.col, sel.selectedPlayer.row).entity = nil
-                self.levelState.grid:getTile(col,row).entity = sel.selectedPlayer
+                self.levelState.grid:getTile(col, row).entity = sel.selectedPlayer
                 sel.selectedPlayer:setMove(path, col, row)
                 sel.isAnimating = true
                 sel.pathLine = path
@@ -302,7 +384,8 @@ function Level:handleAttackSelection(row, col)
         local found = false
         for _, value in ipairs(sel.attackReachable) do
             if row == value.row and col == value.col then
-                self.levelState.currentAttack:cast(value.col, value.row, value.dir, function() self:resetAttackSelection() end)
+                self.levelState.currentAttack:cast(value.col, value.row, value.dir,
+                    function() self:resetAttackSelection() end)
                 self.levelState.selection.attackReachable = {}
                 self.levelState.selection.attackLine = {}
                 found = true
@@ -370,7 +453,7 @@ function Level:handleCurrentSelectedAttack()
             end
         end
     end
-end 
+end
 
 function Level:isInBounds(col, row)
     return col >= 1 and col <= self.config.cols and row >= 1 and row <= self.config.rows

@@ -100,6 +100,9 @@ function Grid:draw()
             local color = t.color or COST_COLORS[t.cost] or { 1, 1, 1, 1 }
             love.graphics.setColor(color)
             love.graphics.rectangle("fill", x, y, self.tileSize, self.tileSize)
+            -- Draw coordinates on top
+            -- love.graphics.setColor(0, 0, 0, 1)
+            -- love.graphics.printf(string.format("%d,%d", col, row), x, y + self.tileSize / 2 - 6, self.tileSize, "center")
             t.color = nil
         end
     end
@@ -108,14 +111,14 @@ end
 function Grid:gridToScreen(col, row)
     local offsetX, offsetY = self:getGridOffset()
     local x = offsetX + (col - 1) * self.tileSize
-    local y = offsetY + (row - 1) * self.tileSize
+    local y = offsetY + (14 - row ) * self.tileSize
     return x, y
 end
 
 function Grid:screenToGrid(x, y)
     local offsetX, offsetY = self:getGridOffset()
     local col = math.floor((x - offsetX) / self.tileSize) + 1
-    local row = math.floor((y - offsetY) / self.tileSize) + 1
+    local row = 14 - math.floor((y - offsetY) / self.tileSize)
     if col >= 1 and col <= self.cols and row >= 1 and row <= self.rows then
         return col, row
     end

@@ -7,9 +7,9 @@ local Config = require('game.Config')
 function TurnManager:new()
     local manager = {
         players = {},
+        enemies = {},
         turnTimer = 0,
         turnDuration = Config.TURN_DURATION,
-        turnWarningTime = Config.TURN_WARNING_TIME,
         onTurnEnd = nil,
         onTurnStart = nil
     }
@@ -89,10 +89,6 @@ end
 
 function TurnManager:setTurnDuration(duration)
     self.turnDuration = duration
-end
-
-function TurnManager:setTurnWarningTime(warningTime)
-    self.turnWarningTime = warningTime
 end
 
 function TurnManager:setTurnEndCallback(callback)

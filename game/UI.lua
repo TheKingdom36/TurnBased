@@ -26,7 +26,7 @@ function UI:new()
 
     -- Initialize UI elements
     ui:createActionPanel()
-    ui:createInfoPanel()
+    ui:createSelectedEntityPanel()
     self.rightPanel = UIRightPanel:new(love.graphics.getWidth() - 600, 300, 300, 600, 10)
 
     -- Register a listener
@@ -59,24 +59,35 @@ function UI:update(dt, levelState)
 end
 
 function UI:updateAttackButtons(levelState)
+    
     if #levelState.currentPlayer.attacks == 0 then
         return
     end
+
+    self.attackButtons = {}
 
     local actionPanelPosX = self.actionPanel.x
     local actionPanelPosY = self.actionPanel.y
 
     local pos = 1
     for i = 1, self.attackButtonsConfig.rows, 1 do
-        for j = 1, self.attackButtonsConfig.cols, 1 do
-            local button = levelState.currentPlayer.attacks[pos]
+        for j = 0, self.attackButtonsConfig.cols, 1 do
+
+            if i+j > #levelState.currentPlayer.attacks then
+                return
+            end
+
+            local button = levelState.currentPlayer.attacks[i+j]
             local x = actionPanelPosX + (i - 1) * (self.attackButtonsConfig.width + 15) + 10
-            local y = actionPanelPosY + (j - 1) * (self.attackButtonsConfig.height + 20) + 100
+            local y = actionPanelPosY + (j) * (self.attackButtonsConfig.height + 20) + 100
+
+            local isClickable = levelState.currentPlayer.stats.mp >= button.mpCost
+
 
             self:addAttackButton(button.name, x, y, self.attackButtonsConfig.width, self.attackButtonsConfig.height,
                 function()
                     levelState.currentAttack = levelState.currentPlayer.attacks[pos]
-                end)
+                end, {1,1,1,1} ,isClickable)
         end
     end
 end
@@ -87,7 +98,7 @@ function UI:draw(gameState, turnManager)
 
     -- Draw panels
     self:drawActionPanel(gameState, turnManager)
-    self:drawInfoPanel(gameState, turnManager)
+    self:drawSelectedEntityPanel(gameState, turnManager)
     self:drawTurnTimer(turnManager)
 
     self.rightPanel:draw()
@@ -104,15 +115,14 @@ function UI:createActionPanel()
     self.actionPanel = panel
 end
 
-function UI:createInfoPanel()
+function UI:createSelectedEntityPanel()
     local panel = {
         x = love.graphics.getWidth() - 210,
         y = 10,
         width = 200,
         height = 150,
-        title = "Game Info"
     }
-    self.infoPanel = panel
+    self.selectedEntityPanel = panel
 end
 
 function UI:drawActionPanel(levelState, turnManager)
@@ -145,8 +155,8 @@ function UI:drawActionPanel(levelState, turnManager)
     self:drawAttackButtons()
 end
 
-function UI:drawInfoPanel(gameState, turnManager)
-    local panel = self.infoPanel
+function UI:drawSelectedEntityPanel(gameState, turnManager)
+    local panel = self.selectedEntityPanel
 
     -- Draw panel background
     love.graphics.setColor(Config.COLORS.UI_BACKGROUND)
@@ -156,16 +166,40 @@ function UI:drawInfoPanel(gameState, turnManager)
     love.graphics.setColor(1, 1, 1, 1)
     love.graphics.rectangle("line", panel.x, panel.y, panel.width, panel.height)
 
-    -- Draw panel title
-    love.graphics.setColor(Config.COLORS.UI_TEXT)
-    love.graphics.print(panel.title, panel.x + 5, panel.y + 5)
+    local entity = gameState.selection.hoveredEntity
 
-    -- Draw game info
-    local y = panel.y + 25
-    --love.graphics.print("Turn: " .. turnManager:getTurnNumber(), panel.x + 5, y)
-    y = y + 20
-    --love.graphics.print("Phase: " .. turnManager:getGamePhase(), panel.x + 5, y)
-    y = y + 20
+    local space = 5
+    local padding = 30
+    if entity then
+        love.graphics.setColor(Config.COLORS.UI_TEXT)
+        love.graphics.print(entity.name, panel.x + 5, panel.y + space)
+        space = space + padding
+
+        if entity.stats == nil then
+            return
+        end
+
+        if entity.stats.health then
+            love.graphics.setColor(Config.COLORS.UI_TEXT)
+            local healthString = "HP: " .. tostring(entity.stats.health) .. "/" .. tostring(entity.stats.maxHealth)
+            love.graphics.print(healthString, panel.x + 5, panel.y + space)
+            space = space + padding
+        end
+
+        if entity.stats.mp then
+            love.graphics.setColor(Config.COLORS.UI_TEXT)
+            local mpString = "MP: " .. tostring(entity.stats.mp) .. "/" .. tostring(entity.stats.maxMp)
+            love.graphics.print(mpString, panel.x + 5, panel.y + space)
+            space = space + padding
+        end
+
+        if entity.stats.speed then
+            love.graphics.setColor(Config.COLORS.UI_TEXT)
+            local speedString = "Speed: " .. tostring(entity.stats.speed)
+            love.graphics.print(speedString, panel.x + 5, panel.y + space)
+        end
+        
+    end
 end
 
 function UI:drawTurnTimer(turnManager)
@@ -199,7 +233,7 @@ function UI:drawTurnTimer(turnManager)
     love.graphics.print(string.format("Time: %.1f", timeRemaining), barX + barWidth / 2 - 30, barY + 2)
 end
 
-function UI:addAttackButton(text, x, y, width, height, callback)
+function UI:addAttackButton(text, x, y, width, height, callback, color , clickable)
     local button = {
         x = x,
         y = y,
@@ -207,7 +241,9 @@ function UI:addAttackButton(text, x, y, width, height, callback)
         height = height,
         text = text,
         callback = callback,
-        isHovered = false
+        isHovered = false,
+        color = color,
+        clickable = clickable
     }
 
     table.insert(self.attackButtons, button)
@@ -215,12 +251,16 @@ end
 
 function UI:drawAttackButtons()
     for index, button in ipairs(self.attackButtons) do
+
         -- Button background
         if button.isHovered then
             love.graphics.setColor(Config.COLORS.UI_BUTTON_HOVER)
-        else
+        elseif button.clickable then
             love.graphics.setColor(Config.COLORS.UI_BUTTON)
+        elseif button.clickable == false then
+            love.graphics.setColor(Config.COLORS.UI_BUTTON_DEACTIVATED)
         end
+
         love.graphics.rectangle("fill", button.x, button.y, button.width, button.height)
 
         -- Button border
@@ -244,7 +284,7 @@ function UI:mousepressed(x, y, button)
     if button == 1 then -- Left click
         for _, uiButton in ipairs(self.attackButtons) do
             if self:isPointInRect(x, y, uiButton.x, uiButton.y, uiButton.width, uiButton.height) then
-                if uiButton.callback then
+                if uiButton.callback and uiButton.clickable then
                     uiButton.callback()
                 end
                 break

@@ -29,7 +29,7 @@ function love.load()
 
     local state = sampleLevel(config)
     
-    level = Level.create(state, config)
+    level = Level:create(state, config)
 
     lurker.postswap = function(file)
         love.load()

@@ -8,7 +8,7 @@ local Wall = setmetatable({}, { __index = Entity })
 Wall.__index = Wall
 
 function Wall:new(col, row)
-    local obj = Entity.new(self, col, row, { 0.3, 0.3, 0.3, 1 })
+    local obj = Entity.new(self, col, row, { 0.3, 0.3, 0.3, 1 } , "Wall")
     setmetatable(obj, self)
     return obj
 end

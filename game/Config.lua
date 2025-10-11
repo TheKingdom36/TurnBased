@@ -38,6 +38,7 @@ Config.COLORS = {
     UI_TEXT = {1, 1, 1, 1},
     UI_BUTTON = {0.3, 0.3, 0.3, 1},
     UI_BUTTON_HOVER = {0.4, 0.4, 0.4, 1},
+    UI_BUTTON_DEACTIVATED = {1, 0.7, 0.7, 1},
     PLAYER_1 = {0.2, 0.6, 1.0, 1},
     PLAYER_2 = {1.0, 0.3, 0.3, 1},
     TURN_INDICATOR = {1, 1, 0, 1},

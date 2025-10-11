@@ -9,10 +9,10 @@
 ---@field animSpeed number
 ---@field animCallback function|nil
 
-local FireBallAnimation = {}
-FireBallAnimation.__index = FireBallAnimation
+local GenericProjectileAnimation = {}
+GenericProjectileAnimation.__index = GenericProjectileAnimation
 
-function FireBallAnimation:new()
+function GenericProjectileAnimation:new()
     local obj = setmetatable({}, self)
     obj.animating = false
     obj.animX = 0
@@ -26,7 +26,7 @@ function FireBallAnimation:new()
     return obj
 end
 
-function FireBallAnimation:start(sx, sy, tx, ty, callback)
+function GenericProjectileAnimation:start(sx, sy, tx, ty, callback)
     self.animX = sx
     self.animY = sy
     self.animTargetX = tx
@@ -41,7 +41,7 @@ function FireBallAnimation:start(sx, sy, tx, ty, callback)
     self.animCallback = callback
 end
 
-function FireBallAnimation:update(dt)
+function GenericProjectileAnimation:update(dt)
     if self.animating then
         local dx = self.animTargetX - self.animX
         local dy = self.animTargetY - self.animY
@@ -62,7 +62,7 @@ function FireBallAnimation:update(dt)
     end
 end
 
-function FireBallAnimation:draw()
+function GenericProjectileAnimation:draw()
     if self.animating then
         love.graphics.setColor(1, 0, 0, 1)
         love.graphics.circle("fill", self.animX, self.animY, 12)
@@ -70,4 +70,4 @@ function FireBallAnimation:draw()
     end
 end
 
-return FireBallAnimation
+return GenericProjectileAnimation

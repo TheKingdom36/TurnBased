@@ -25,37 +25,37 @@ function AttackBase:getTravelType()
     return self.range or 1
 end
 
-local FireBallAnimation = require('game.attacks.animations.FireBallAnimation')
-local FireBall = setmetatable({}, AttackBase)
-FireBall.__index = FireBall
+local IceBallAnimation = require('game.attacks.animations.FireBallAnimation')
+local IceBall = setmetatable({}, AttackBase)
+IceBall.__index = IceBall
 
-function FireBall:new(player, grid)
+function IceBall:new(player, grid)
     local obj = setmetatable({}, self)
     obj.range = { near = 1, far = 3 }
-    obj.damage = 10
-    obj.mpCost = 5
-    obj.name = "Fireball"
+    obj.damage = 8
+    obj.mpCost = 8
+    obj.name = "Iceball"
     obj.describtion = "Fire a ball of fire in a stright line"
     obj.grid = grid
     obj.player = player
-    obj.impactShape = Shapes.SINGLE_POINT
+    obj.impactShape = Shapes.SQUARE_3x3
     obj.launchShape = Shapes.FOUR_POINT
     obj.travelType = TravelType.PROJECTILE
-    obj.animation = FireBallAnimation:new()
+    obj.animation = IceBallAnimation:new()
     return obj
 end
 
-function FireBall:getImpactShape()
+function IceBall:getImpactShape()
     return self.impactShape
 end
 
-function FireBall:getLaunchShape()
+function IceBall:getLaunchShape()
     return self.launchShape
 end
 
 -- Casts the fireball and triggers animation. Callback runs when animation completes.
-function FireBall:cast(x, y, dir, callback)
-    EventSystem:emit("log_action", self.player.name .. " attcking with fireball")
+function IceBall:cast(x, y, dir, callback)
+    EventSystem:emit("log_action", self.player.name .. " attcking with iceball")
     -- Find stop point
     local function findFireballStop(grid, col, row, dir)
         local c, r = col, row
@@ -78,7 +78,13 @@ function FireBall:cast(x, y, dir, callback)
 
     local outerSelf = self
     local endOfAnimation = function()
-        outerSelf.grid:getTile(stopCol, stopRow).entity:takeDamage(outerSelf.damage)
+        for index, value in ipairs(self.impactShape) do
+            local tile = outerSelf.grid:getTile(stopCol + value.y, stopRow + value.x)
+            if tile then
+                tile.entity:takeDamage(outerSelf.damage)
+            end
+        end
+        
         self.player:reduceMp(self.mpCost)
         if callback then
             callback()
@@ -88,16 +94,16 @@ function FireBall:cast(x, y, dir, callback)
     self.animation:start(sx, sy, tx, ty, endOfAnimation)
 end
 
-function FireBall:isAnimating()
+function IceBall:isAnimating()
     return self.animation.animating
 end
 
-function FireBall:update(dt)
+function IceBall:update(dt)
     self.animation:update(dt)
 end
 
-function FireBall:draw()
+function IceBall:draw()
     self.animation:draw()
 end
 
-return FireBall
+return IceBall

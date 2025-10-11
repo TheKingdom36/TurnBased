@@ -2,17 +2,16 @@
 ---@field col integer The column position of the player on the grid
 ---@field row integer The row position of the player on the grid
 ---@field stats table Player stats (health, maxHealth, state, etc)
----@field name string|nil Optional player name
 ---@field color table|nil Optional color for rendering
 ---@field sprite any|nil Optional sprite for rendering
 ---@field State table Player state enum
 ---@field update fun(self:Player,dt:number)
 ---@field draw fun(self:Player,tileSize:number,offsetX:number,offsetY:number)
 ---@field setMove fun(self:Player,path:table,row:integer,col:integer)
----@class Player
 
-local Entity = require('game.entities.Enemy')
+local Entity = require('game.entities.Entity')
 local EventSystem = require('game.EventSystem')
+
 local Player = setmetatable({}, { __index = Entity })
 Player.__index = Player
 
@@ -26,22 +25,14 @@ Player.State = {
 }
 
 
-function Player:new(col, row)
-    local player = Entity.new(self, col, row, { 0.2, 0.6, 1.0, 1 })
+function Player:new(col, row , name, stats)
+    local player = Entity:new(col, row, { 0.2, 0.6, 1.0, 1 }, name, stats)
     player.radius = 18
     player.path = nil -- for animation
     player.pathStep = 1
     player.animTime = 0
     player.animSpeed = 0.15 -- seconds per tile
-    player.stats = {
-        actionPointsRemaining = 2,
-        health = 100,
-        maxHealth = 100,
-        state = Player.State.WAITING
-        -- Add more stats here as needed (mana, etc.)
-    }
     player.attacks = {}
-    player.name = "default"
     setmetatable(player, self)
     return player
 end
@@ -53,9 +44,9 @@ function Player:setMove(path, col, row)
         self.pathStep = 1
         self.animTime = 0
         self.stats.actionPointsRemaining = self.stats.actionPointsRemaining - 1
-        self.row = row
         self.col = col
-        EventSystem:emit("log_action", "I am moving")
+        self.row = row
+        EventSystem:emit("log_action", self.name .. " moved to ( " .. col .. " , ".. row .." )")
     end
 end
 
@@ -71,7 +62,7 @@ function Player:draw(tileSize, offsetX, offsetY)
     offsetX = offsetX or 0
     offsetY = offsetY or 0
     local x = offsetX + (self.col - 0.5) * tileSize
-    local y = offsetY + (self.row - 0.5) * tileSize
+    local y = offsetY + (15 - self.row - 0.5) * tileSize
     love.graphics.setColor(self.color)
     love.graphics.circle("fill", x, y, self.radius)
     love.graphics.setColor(1, 1, 1, 1)
@@ -96,6 +87,10 @@ function Player:doMove(dt)
             self.row = self.path[self.pathStep].row
         end
     end
+end
+
+function Player:reduceMp(mpCost)
+    self.stats.mp = self.stats.mp - mpCost
 end
 
 return Player

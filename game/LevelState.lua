@@ -43,6 +43,7 @@ function LevelState:new()
         grid = nil,   -- The game grid
         players = {}, -- List of player objects
         enemies = {}, -- List of enemy objects
+        entities = {}, -- List of all entities that are not players or enemies
         ---@type LevelSelection
         selection = {
             first = { col = nil, row = nil },
@@ -55,7 +56,8 @@ function LevelState:new()
             selectedAttack = nil,
             attackReachable = {},
             attackLine = nil,
-            attackLineAlpha = 2
+            attackLineAlpha = 2,
+            hoveredEntity = nil
         },
         currentPlayer = nil,
         currentAttack = nil,
