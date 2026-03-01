@@ -27,7 +27,7 @@ Player.State = {
 
 function Player:new(col, row , name, stats)
     local player = Entity:new(col, row, { 0.2, 0.6, 1.0, 1 }, name, stats)
-    player.radius = 18
+    player.radius = 20
     player.path = nil -- for animation
     player.pathStep = 1
     player.animTime = 0
@@ -63,7 +63,7 @@ function Player:draw(tileSize, offsetX, offsetY)
     offsetX = offsetX or 0
     offsetY = offsetY or 0
     local x = offsetX + (self.col - 0.5) * tileSize
-    local y = offsetY + (15 - self.row - 0.5) * tileSize
+    local y = offsetY + (10 - self.row - 0.5) * tileSize
     love.graphics.setColor(self.color)
     love.graphics.circle("fill", x, y, self.radius)
     love.graphics.setColor(1, 1, 1, 1)

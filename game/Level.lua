@@ -212,7 +212,7 @@ function Level:mousepressed(x, y, button)
     if button == 1 and not self.levelState.selection.isAnimating then
         local offsetX, offsetY = self.levelState.grid:getGridOffset()
         local col = math.floor((x - offsetX) / self.levelState.tileSize) + 1
-        local row = 14 - math.floor((y - offsetY) / self.levelState.tileSize)
+        local row = self.levelState.rows - math.floor((y - offsetY) / self.levelState.tileSize)
         if col >= 1 and col <= self.levelState.cols and row >= 1 and row <= self.levelState.rows then
             self:handlePlayerSelection(col, row)
             self:handleAttackSelection(row, col)
@@ -224,11 +224,8 @@ end
 
 function Level:keypressed(key)
     if self.levelState.selection.isAnimating then return end
-    if key == "up" then
-        self:adjustMaxDistance(1)
-    elseif key == "down" then
-        self:adjustMaxDistance(-1)
-    elseif tonumber(key) then
+
+    if tonumber(key) then
         self.config.maxDistance = tonumber(key)
     elseif key == "o" then
         EventSystem:emit("log_action", "Clearing log")
@@ -357,16 +354,6 @@ function Level:draw()
 
         love.graphics.setLineWidth(1)
     end
-
-    -- UI box and help text (keep at top left and bottom)
-    love.graphics.setColor(0, 0, 0, 0.7)
-    love.graphics.rectangle("fill", 10, 10, 180, 32, 6, 6)
-    love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.rectangle("line", 10, 10, 180, 32, 6, 6)
-    love.graphics.print("Max Distance: " .. tostring(self.config.maxDistance), 18, 18)
-    love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.print("Click a player, then a tile in range to move. Use UP/DOWN or 1-9 to set max distance.", 10,
-        love.graphics.getHeight() - 32)
 
     -- need to initate the game state object
     self.ui:draw(self.levelState, self.turnManager)

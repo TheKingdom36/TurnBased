@@ -13,7 +13,7 @@ return function(config)
 
   state.cols = 9
   state.rows = 9
-  state.tileSize = 48
+  state.tileSize = 80
 
   -- Create grid
   state.grid = Grid:new(state.cols, state.rows, state.tileSize)
@@ -54,8 +54,8 @@ return function(config)
   table.insert(player.attacks, iceball)
   iceball.player = player
 
-  local armBone = Bone:new(BoneTypes.ARM, "Arm Bone", 3)
-  local legBone = Bone:new(BoneTypes.LEG, "Leg Bone", 3)
+  local armBone = Bone:new(BoneTypes.SHORT_BONE, "SHORT BONE", 3)
+  local legBone = Bone:new(BoneTypes.LONG_BONE, "LONG BONE", 3)
 
   table.insert(player.bones, armBone)
   table.insert(player.bones, legBone)
@@ -75,9 +75,9 @@ return function(config)
 
   -- Create two enemies at (8,8) and (10,5)
   state.enemies = {
-    Enemy:new(1, 1, "one", enemyStats()),
+    Enemy:new(2, 3, "one", enemyStats()),
     Enemy:new(4, 5, "two", enemyStats()),
-    Enemy:new(1, 6, "three", enemyStats()),
+    Enemy:new(5, 3, "three", enemyStats()),
   }
 
 

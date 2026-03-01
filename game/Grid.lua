@@ -111,14 +111,14 @@ end
 function Grid:gridToScreen(col, row)
     local offsetX, offsetY = self:getGridOffset()
     local x = offsetX + (col - 1) * self.tileSize
-    local y = offsetY + (14 - row ) * self.tileSize
+    local y = offsetY + (self.rows - row) * self.tileSize
     return x, y
 end
 
 function Grid:screenToGrid(x, y)
     local offsetX, offsetY = self:getGridOffset()
     local col = math.floor((x - offsetX) / self.tileSize) + 1
-    local row = 14 - math.floor((y - offsetY) / self.tileSize)
+    local row = self.rows - math.floor((y - offsetY) / self.tileSize)
     if col >= 1 and col <= self.cols and row >= 1 and row <= self.rows then
         return col, row
     end
@@ -128,15 +128,10 @@ end
 function Grid:getGridOffset()
     local winW = love.graphics.getWidth()
     local winH = love.graphics.getHeight()
-    local padX = winW * 0.2
-    local padY = winH * 0.2
     local gridW = self.cols * self.tileSize
     local gridH = self.rows * self.tileSize
     local offsetX = (winW - gridW) / 2
     local offsetY = (winH - gridH) / 2
-    -- Clamp to at least 20% padding
-    offsetX = math.max(offsetX, padX)
-    offsetY = math.max(offsetY, padY)
     return offsetX, offsetY, gridW, gridH
 end
 

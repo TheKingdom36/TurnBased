@@ -27,12 +27,13 @@ end
 function Enemy:draw(tileSize, offsetX, offsetY)
     offsetX = offsetX or 0
     offsetY = offsetY or 0
-    local x = offsetX + (self.col - 1) * tileSize
-    local y = offsetY + (15 - self.row - 1) * tileSize
+    local x = offsetX + (self.col - 0.5) * tileSize
+    local y = offsetY + (10 - self.row - 0.5) * tileSize
+    local size = tileSize * 0.5
     love.graphics.setColor(self.color)
-    love.graphics.rectangle("fill", x, y, tileSize, tileSize)
+    love.graphics.rectangle("fill", x - size/2, y - size/2, size, size)
     love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.rectangle("line", x, y, tileSize, tileSize)
+    love.graphics.rectangle("line", x - size/2, y - size/2, size, size)
 end
 
 function Enemy:update(dt)

@@ -202,7 +202,6 @@ function UI:draw(gameState, turnManager)
     self:drawActionPanel(gameState, turnManager)
     self:drawBonePanel(gameState)
     self:drawSelectedEntityPanel(gameState, turnManager)
-    self:drawTurnTimer(turnManager)
 
     self.rightPanel:draw()
 end
@@ -210,7 +209,7 @@ end
 function UI:createActionPanel()
     local panel = {
         x = 10,
-        y = love.graphics.getHeight() - 400,
+        y = 480,
         width = 300,
         height = 300,
         title = "Actions"
@@ -221,7 +220,7 @@ end
 function UI:createBonePanel()
     local panel = {
         x = 10,
-        y = love.graphics.getHeight() - 750,
+        y = 170,
         width = 300,
         height = 300,
         title = "Bone"
@@ -231,7 +230,7 @@ end
 
 function UI:createSelectedEntityPanel()
     local panel = {
-        x = love.graphics.getWidth() - 210,
+        x = 10,
         y = 10,
         width = 200,
         height = 150,
@@ -363,34 +362,6 @@ function UI:drawSelectedEntityPanel(gameState, turnManager)
             love.graphics.print(speedString, panel.x + 5, panel.y + space)
         end
     end
-end
-
-function UI:drawTurnTimer(turnManager)
-    local timeRemaining = turnManager:getTurnTimeRemaining()
-    local progress = turnManager:getTurnProgress()
-
-    -- Draw timer bar
-    local barX = 220
-    local barY = 10
-    local barWidth = 300
-    local barHeight = 20
-
-    -- Background
-    love.graphics.setColor(0.3, 0.3, 0.3, 1)
-    love.graphics.rectangle("fill", barX, barY, barWidth, barHeight)
-
-    -- Progress
-    local color = { 0.2, 0.8, 0.2, 1 }
-    love.graphics.setColor(color)
-    love.graphics.rectangle("fill", barX, barY, barWidth * progress, barHeight)
-
-    -- Border
-    love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.rectangle("line", barX, barY, barWidth, barHeight)
-
-    -- Time text
-    love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.print(string.format("Time: %.1f", timeRemaining), barX + barWidth / 2 - 30, barY + 2)
 end
 
 function UI:addAttackButton(text, x, y, width, height, callback, color, clickable)
