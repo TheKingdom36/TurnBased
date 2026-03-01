@@ -22,7 +22,7 @@ Config.PLAYER_MOVEMENT_RANGE = 3
 Config.PLAYER_ATTACK_RANGE = 2
 
 -- Turn settings
-Config.TURN_DURATION = 30 -- seconds per turn
+Config.TURN_DURATION = 30     -- seconds per turn
 Config.TURN_WARNING_TIME = 10 -- seconds before turn ends
 
 -- UI settings
@@ -33,23 +33,27 @@ Config.UI_BUTTON_WIDTH = 120
 
 -- Colors
 Config.COLORS = {
-    BACKGROUND = {0.1, 0.1, 0.1, 1},
-    UI_BACKGROUND = {0.2, 0.2, 0.2, 0.8},
-    UI_TEXT = {1, 1, 1, 1},
-    UI_BUTTON = {0.3, 0.3, 0.3, 1},
-    UI_BUTTON_HOVER = {0.4, 0.4, 0.4, 1},
-    UI_BUTTON_DEACTIVATED = {1, 0.7, 0.7, 1},
-    PLAYER_1 = {0.2, 0.6, 1.0, 1},
-    PLAYER_2 = {1.0, 0.3, 0.3, 1},
-    TURN_INDICATOR = {1, 1, 0, 1},
-    HEALTH_BAR_BG = {0.3, 0.3, 0.3, 1},
-    HEALTH_BAR_FG = {0.2, 0.8, 0.2, 1},
-    GRID_GRASS = {0.2, 0.6, 0.2, 1},
-    GRID_OCCUPIED = {0.8, 0.8, 0.2, 1},
-    GRID_OBSTACLE = {0.3, 0.3, 0.3, 1},
-    GRID_BORDER = {0.1, 0.1, 0.1, 1},
-    MOVEMENT_RANGE = {0, 1, 0, 0.3},
-    ATTACK_RANGE = {1, 0, 0, 0.3}
+    BACKGROUND = { 0.1, 0.1, 0.1, 1 },
+    UI_BACKGROUND = { 0.2, 0.2, 0.2, 0.8 },
+    UI_TEXT = { 1, 1, 1, 1 },
+    UI_BUTTON = { 0.3, 0.3, 0.3, 1 },
+    UI_BUTTON_SELECTED = { 0.6, 0.6, 0.2, 1 },
+    UI_BUTTON_HOVER = { 0.4, 0.4, 0.4, 1 },
+    UI_BUTTON_DEACTIVATED = { 1, 0.7, 0.7, 1 },
+    PLAYER_1 = { 0.2, 0.6, 1.0, 1 },
+    PLAYER_2 = { 1.0, 0.3, 0.3, 1 },
+    TURN_INDICATOR = { 1, 1, 0, 1 },
+    HEALTH_BAR_BG = { 0.3, 0.3, 0.3, 1 },
+    HEALTH_BAR_FG = { 0.2, 0.8, 0.2, 1 },
+    GRID_GRASS = { 0.2, 0.6, 0.2, 1 },
+    GRID_OCCUPIED = { 0.8, 0.8, 0.2, 1 },
+    GRID_OBSTACLE = { 0.3, 0.3, 0.3, 1 },
+    GRID_BORDER = { 0.1, 0.1, 0.1, 1 },
+    MOVEMENT_RANGE = { 0, 1, 0, 0.3 },
+    ATTACK_RANGE = { 1, 0, 0, 0.3 }
 }
 
-return Config 
+-- Debug settings
+Config.DEBUG_STATE_WINDOW = true -- Set to true to enable state debugger window on startup
+
+return Config

@@ -3,6 +3,8 @@ local UI = require('game.UI')
 local TurnManager = require('game.TurnManager')
 local computeReachable = require('game.PathFindingUtils')
 local EventSystem = require('game.EventSystem')
+local StateWindowDebugger = require('game.StateWindowDebugger')
+local Config = require('game.Config')
 
 if os.getenv("LOCAL_LUA_DEBUGGER_VSCODE") == "1" then
     require("lldebugger").start()
@@ -63,6 +65,19 @@ function Level:create(levelState, config)
         end
     end
 
+    level.turnManager.onTurnStart()
+
+    local newTurn = function(entity)
+        if (entity.name == "Jack") then
+            level.levelState.isPlayer = true
+        else
+            level.levelState.isPlayer = false
+        end
+    end
+
+    -- TODO need to have different functionality for player and enemy
+    EventSystem:register("newTurn", newTurn)
+
     for index, player in ipairs(levelState.players) do
         level.levelState.grid:getTile(player.col, player.row).entity = player
     end
@@ -73,14 +88,17 @@ function Level:create(levelState, config)
 
     level.ui = UI:new()
 
+    -- Initialize state debugger if enabled
+    if Config.DEBUG_STATE_WINDOW then
+        level.stateDebugger = StateWindowDebugger:new(levelState, 400, 600)
+    end
+
     return level
 end
 
-function Level:update(dt)
-    if #self.turnManager.players == 0 then
-        self.turnManager:onTurnStart()
-    end
+-- look into how love 2d does animations may need to do sprite sheet
 
+function Level:update(dt)
     if self.levelState.currentAttack then
         self.levelState.currentAttack:update(dt)
     end
@@ -118,18 +136,22 @@ function Level:update(dt)
 
     local gx, gy = self.levelState.grid:screenToGrid(mx, my)
     if gx ~= nil and gy ~= nil and self:isInBounds(gx, gy) then
-        local entity = self:entityAt(gx,gy)
+        local entity = self:entityAt(gx, gy)
         if entity then
             self.levelState.selection.hoveredEntity = entity
         else
             self.levelState.selection.hoveredEntity = nil
         end
-    else 
+    else
         self.levelState.selection.hoveredEntity = nil
     end
 
-
     self.ui:update(dt, self.levelState)
+
+    -- Update state debugger if active
+    if self.stateDebugger then
+        self.stateDebugger:update(dt)
+    end
 end
 
 function Level:playerAt(col, row)
@@ -180,13 +202,18 @@ function Level:resetAttackSelection()
 end
 
 function Level:mousepressed(x, y, button)
+    -- Check state debugger first (top overlay)
+    if self.stateDebugger and self.stateDebugger:mousepressed(x, y, button) then
+        return
+    end
+
     self.ui:mousepressed(x, y, button)
 
     if button == 1 and not self.levelState.selection.isAnimating then
         local offsetX, offsetY = self.levelState.grid:getGridOffset()
-        local col = math.floor((x - offsetX) / self.config.tileSize) + 1
-        local row = 14 - math.floor((y - offsetY) / self.config.tileSize)
-        if col >= 1 and col <= self.config.cols and row >= 1 and row <= self.config.rows then
+        local col = math.floor((x - offsetX) / self.levelState.tileSize) + 1
+        local row = 14 - math.floor((y - offsetY) / self.levelState.tileSize)
+        if col >= 1 and col <= self.levelState.cols and row >= 1 and row <= self.levelState.rows then
             self:handlePlayerSelection(col, row)
             self:handleAttackSelection(row, col)
         else
@@ -198,12 +225,26 @@ end
 function Level:keypressed(key)
     if self.levelState.selection.isAnimating then return end
     if key == "up" then
-        self.config.maxDistance = self.config.maxDistance + 1
+        self:adjustMaxDistance(1)
     elseif key == "down" then
-        self.config.maxDistance = math.max(1, self.config.maxDistance - 1)
+        self:adjustMaxDistance(-1)
     elseif tonumber(key) then
         self.config.maxDistance = tonumber(key)
+    elseif key == "o" then
+        EventSystem:emit("log_action", "Clearing log")
+        self:resetSelection()
+        self:resetAttackSelection()
     end
+end
+
+function Level:wheelmoved(x, y)
+    if self.stateDebugger and self.stateDebugger:wheelmoved(x, y) then
+        return
+    end
+end
+
+function Level:adjustMaxDistance(delta)
+    self.config.maxDistance = math.max(1, self.config.maxDistance + delta)
     local sel = self.levelState.selection
     if sel.selectedPlayer then
         sel.first.col = sel.selectedPlayer.col
@@ -237,17 +278,17 @@ function Level:draw()
     for _, tile in ipairs(sel.reachable) do
         local x, y = self.levelState.grid:gridToScreen(tile.col, tile.row)
         love.graphics.setColor(0.2, 1, 0.2, 0.4)
-        love.graphics.rectangle("fill", x, y, self.config.tileSize, self.config.tileSize)
+        love.graphics.rectangle("fill", x, y, self.levelState.tileSize, self.levelState.tileSize)
     end
     if sel.first.col and sel.first.row then
         local x, y = self.levelState.grid:gridToScreen(sel.first.col, sel.first.row)
         love.graphics.setColor(1, 1, 0, 0.5)
-        love.graphics.rectangle("fill", x, y, self.config.tileSize, self.config.tileSize)
+        love.graphics.rectangle("fill", x, y, self.levelState.tileSize, self.levelState.tileSize)
     end
     if sel.second.col and sel.second.row then
         local x, y = self.levelState.grid:gridToScreen(sel.second.col, sel.second.row)
         love.graphics.setColor(1, 0.5, 0, 0.5)
-        love.graphics.rectangle("fill", x, y, self.config.tileSize, self.config.tileSize)
+        love.graphics.rectangle("fill", x, y, self.levelState.tileSize, self.levelState.tileSize)
     end
     if sel.pathLine and sel.pathLineAlpha > 0 then
         love.graphics.setColor(1, 0.2, 0.2, 0.7 * sel.pathLineAlpha)
@@ -256,41 +297,41 @@ function Level:draw()
             local b = sel.pathLine[i + 1]
             local ax, ay = self.levelState.grid:gridToScreen(a.col, a.row)
             local bx, by = self.levelState.grid:gridToScreen(b.col, b.row)
-            ax = ax + self.config.tileSize / 2
-            ay = ay + self.config.tileSize / 2
-            bx = bx + self.config.tileSize / 2
-            by = by + self.config.tileSize / 2
+            ax = ax + self.levelState.tileSize / 2
+            ay = ay + self.levelState.tileSize / 2
+            bx = bx + self.levelState.tileSize / 2
+            by = by + self.levelState.tileSize / 2
             love.graphics.setLineWidth(6)
             love.graphics.line(ax, ay, bx, by)
         end
         love.graphics.setLineWidth(1)
     end
 
-    for col = 1, self.config.cols do
-        for row = 1, self.config.rows do
+    for col = 1, self.levelState.cols do
+        for row = 1, self.levelState.rows do
             local t = self.levelState.grid:getTile(col, row)
             local x, y = self.levelState.grid:gridToScreen(col, row)
             if t.highlightColor then
                 love.graphics.setColor(t.highlightColor)
-                love.graphics.rectangle("fill", x, y, self.config.tileSize, self.config.tileSize)
+                love.graphics.rectangle("fill", x, y, self.levelState.tileSize, self.levelState.tileSize)
             end
             if t.hovered then
                 love.graphics.setColor(0.2, 0.8, 1, 0.4)
-                love.graphics.rectangle("fill", x, y, self.config.tileSize, self.config.tileSize)
+                love.graphics.rectangle("fill", x, y, self.levelState.tileSize, self.levelState.tileSize)
             end
             love.graphics.setColor(0.4, 0.4, 0.4, 1)
-            love.graphics.rectangle("line", x, y, self.config.tileSize, self.config.tileSize)
+            love.graphics.rectangle("line", x, y, self.levelState.tileSize, self.levelState.tileSize)
             t.highlightColor = nil -- Reset highlight after drawing
         end
     end
 
     -- Draw enemies
     for _, enemy in ipairs(self.levelState.enemies or {}) do
-        enemy:draw(self.config.tileSize, offsetX, offsetY)
+        enemy:draw(self.levelState.tileSize, offsetX, offsetY)
     end
     -- Draw players
     for _, player in ipairs(self.levelState.players or {}) do
-        player:draw(self.config.tileSize, offsetX, offsetY)
+        player:draw(self.levelState.tileSize, offsetX, offsetY)
     end
 
     if sel.attackLine and #sel.attackLine > 0 and sel.attackLineAlpha > 0 then
@@ -300,18 +341,18 @@ function Level:draw()
             local b = sel.attackLine[i + 1]
             local ax, ay = self.levelState.grid:gridToScreen(a.col, a.row)
             local bx, by = self.levelState.grid:gridToScreen(b.col, b.row)
-            ax = ax + self.config.tileSize / 2
-            ay = ay + self.config.tileSize / 2
-            bx = bx + self.config.tileSize / 2
-            by = by + self.config.tileSize / 2
+            ax = ax + self.levelState.tileSize / 2
+            ay = ay + self.levelState.tileSize / 2
+            bx = bx + self.levelState.tileSize / 2
+            by = by + self.levelState.tileSize / 2
             love.graphics.setLineWidth(6)
             love.graphics.line(ax, ay, bx, by)
         end
 
         local final = sel.attackLine[#sel.attackLine]
         local finalx, finaly = self.levelState.grid:gridToScreen(final.col, final.row)
-        finalx = finalx + self.config.tileSize / 2
-        finaly = finaly + self.config.tileSize / 2
+        finalx = finalx + self.levelState.tileSize / 2
+        finaly = finaly + self.levelState.tileSize / 2
         love.graphics.circle("fill", finalx, finaly, 10, 100)
 
         love.graphics.setLineWidth(1)
@@ -329,6 +370,11 @@ function Level:draw()
 
     -- need to initate the game state object
     self.ui:draw(self.levelState, self.turnManager)
+
+    -- Draw state debugger if active
+    if self.stateDebugger then
+        self.stateDebugger:draw()
+    end
 end
 
 function Level:handleEntitySelection(col, row)
@@ -446,8 +492,8 @@ function Level:handleCurrentSelectedAttack()
         end
     else
         -- Clear all onHover functions when no attack is selected
-        for col = 1, self.config.cols do
-            for row = 1, self.config.rows do
+        for col = 1, self.levelState.cols do
+            for row = 1, self.levelState.rows do
                 local tile = self.levelState.grid:getTile(col, row)
                 tile.onHover = nil
             end
@@ -456,7 +502,7 @@ function Level:handleCurrentSelectedAttack()
 end
 
 function Level:isInBounds(col, row)
-    return col >= 1 and col <= self.config.cols and row >= 1 and row <= self.config.rows
+    return col >= 1 and col <= self.levelState.cols and row >= 1 and row <= self.levelState.rows
 end
 
 return Level

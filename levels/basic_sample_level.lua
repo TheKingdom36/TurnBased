@@ -5,18 +5,24 @@ local LevelState = require('game.LevelState')
 local Fireball = require('game.attacks.Fireball')
 local Iceball = require('game.attacks.Iceball')
 local Wall = require('game.entities.Wall')
+local BoneTypes = require('game.bones.Types')
+local Bone = require('game.bones.bone')
 
 return function(config)
   local state = LevelState:new()
 
+  state.cols = 9
+  state.rows = 9
+  state.tileSize = 48
+
   -- Create grid
-  state.grid = Grid:new(config.cols, config.rows, config.tileSize)
+  state.grid = Grid:new(state.cols, state.rows, state.tileSize)
 
   -- Place walls on the outer ring
   state.walls = {}
-  for col = 1, config.cols do
-    for row = 1, config.rows do
-      if col == 1 or col == config.cols or row == 1 or row == config.rows then
+  for col = 1, state.cols do
+    for row = 1, state.rows do
+      if col == 1 or col == state.cols or row == 1 or row == state.rows then
         local wall = Wall:new(col, row)
         table.insert(state.walls, wall)
         state.grid:setCost(col, row, math.huge)
@@ -48,9 +54,15 @@ return function(config)
   table.insert(player.attacks, iceball)
   iceball.player = player
 
+  local armBone = Bone:new(BoneTypes.ARM, "Arm Bone", 3)
+  local legBone = Bone:new(BoneTypes.LEG, "Leg Bone", 3)
+
+  table.insert(player.bones, armBone)
+  table.insert(player.bones, legBone)
+
   state.players = { player }
 
-  local enemyStats = function() 
+  local enemyStats = function()
     return {
       actionPointsRemaining = 2,
       health = 100,
@@ -63,9 +75,9 @@ return function(config)
 
   -- Create two enemies at (8,8) and (10,5)
   state.enemies = {
-    Enemy:new(8, 8 , "one", enemyStats()),
-    Enemy:new(10, 5, "two", enemyStats()),
-    Enemy:new(8, 9, "three", enemyStats()),
+    Enemy:new(1, 1, "one", enemyStats()),
+    Enemy:new(4, 5, "two", enemyStats()),
+    Enemy:new(1, 6, "three", enemyStats()),
   }
 
 

@@ -20,16 +20,13 @@ function love.load()
     end
 
     local config    = {
-            cols = 18,
-            rows = 14,
-            tileSize = 48,
-            maxDistance = 8,
-            pathLineFadeTime = 2,
+        maxDistance = 8,
+        pathLineFadeTime = 2,
     }
 
-    local state = sampleLevel(config)
-    
-    level = Level:create(state, config)
+    local state     = sampleLevel(config)
+
+    level           = Level:create(state, config)
 
     lurker.postswap = function(file)
         love.load()
@@ -51,4 +48,10 @@ end
 
 function love.keypressed(key)
     level:keypressed(key)
+end
+
+function love.wheelmoved(x, y)
+    if level.wheelmoved then
+        level:wheelmoved(x, y)
+    end
 end

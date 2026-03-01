@@ -46,11 +46,16 @@ function UIRightPanel:draw()
     love.graphics.setColor(1, 1, 1, 1)
     local lineHeight = self.font:getHeight() + 2
     local textY = y + 10 - self.scrollOffset
+    local textWidth = self.width - 20 -- Account for padding on both sides
+
     for _, line in ipairs(self.lines) do
-        if textY + lineHeight > y and textY < y + self.height then
-            love.graphics.print(line, x + 10, textY)
+        local _, wrappedLines = self.font:getWrap(line, textWidth)
+        local wrappedHeight = #wrappedLines * lineHeight
+
+        if textY + wrappedHeight > y and textY < y + self.height then
+            love.graphics.printf(line, x + 10, textY, textWidth, "left")
         end
-        textY = textY + lineHeight
+        textY = textY + wrappedHeight
     end
     love.graphics.setScissor()
 end

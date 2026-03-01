@@ -40,9 +40,9 @@ local LevelState = {}
 
 function LevelState:new()
     local state = {
-        grid = nil,   -- The game grid
-        players = {}, -- List of player objects
-        enemies = {}, -- List of enemy objects
+        grid = nil,    -- The game grid
+        players = {},  -- List of player objects
+        enemies = {},  -- List of enemy objects
         entities = {}, -- List of all entities that are not players or enemies
         ---@type LevelSelection
         selection = {
@@ -61,6 +61,7 @@ function LevelState:new()
         },
         currentPlayer = nil,
         currentAttack = nil,
+        selectedBones = {},
         gamePhase = Phase.TURN_START,
         turnNumber = 1,
     }
@@ -100,6 +101,51 @@ function LevelState:reset()
     self.currentPlayer = nil
     self.gamePhase = "playing"
     self.turnNumber = 1
+end
+
+function LevelState:__tostring()
+    local playerCount = #self.players
+    local enemyCount = #self.enemies
+    local currentPlayerName = self.currentPlayer and self.currentPlayer.name or "None"
+
+    local attacksList = "None"
+    if self.currentPlayer and self.currentPlayer.attacks then
+        local attackNames = {}
+        for i, attack in ipairs(self.currentPlayer.attacks) do
+            table.insert(attackNames, attack.name or "Attack" .. i)
+        end
+        attacksList = #attackNames > 0 and table.concat(attackNames, ", ") or "None"
+    end
+
+    local bonesList = "None"
+    if self.currentPlayer and self.currentPlayer.bones then
+        local boneNames = {}
+        for i, bone in ipairs(self.currentPlayer.bones) do
+            table.insert(boneNames, bone.name or "Bone" .. i)
+        end
+        bonesList = #boneNames > 0 and table.concat(boneNames, ", ") or "None"
+    end
+
+    local selectedBonesList = "None"
+    if self.selectedBones and #self.selectedBones > 0 then
+        local selectedBoneNames = {}
+        for i, bone in ipairs(self.selectedBones) do
+            table.insert(selectedBoneNames, bone.name or "Bone" .. i)
+        end
+        selectedBonesList = table.concat(selectedBoneNames, ", ")
+    end
+
+    return string.format(
+        "LevelState { Turn: %d, Phase: %s, Players: %d, Enemies: %d, Current: %s, Attacks: [%s], Bones: [%s], Selected: [%s] }",
+        self.turnNumber,
+        self.gamePhase,
+        playerCount,
+        enemyCount,
+        currentPlayerName,
+        attacksList,
+        bonesList,
+        selectedBonesList
+    )
 end
 
 return LevelState

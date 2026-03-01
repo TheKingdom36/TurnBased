@@ -35,7 +35,7 @@ function IceBall:new(player, grid)
     obj.damage = 8
     obj.mpCost = 8
     obj.name = "Iceball"
-    obj.describtion = "Fire a ball of fire in a stright line"
+    obj.describtion = "Fire a ball of ice in a stright line"
     obj.grid = grid
     obj.player = player
     obj.impactShape = Shapes.SQUARE_3x3
@@ -53,11 +53,11 @@ function IceBall:getLaunchShape()
     return self.launchShape
 end
 
--- Casts the fireball and triggers animation. Callback runs when animation completes.
+-- Casts the iceball and triggers animation. Callback runs when animation completes.
 function IceBall:cast(x, y, dir, callback)
     EventSystem:emit("log_action", self.player.name .. " attcking with iceball")
     -- Find stop point
-    local function findFireballStop(grid, col, row, dir)
+    local function findIceballStop(grid, col, row, dir)
         local c, r = col, row
         while true do
             c = c + dir.col
@@ -68,7 +68,7 @@ function IceBall:cast(x, y, dir, callback)
             end
         end
     end
-    local stopCol, stopRow = findFireballStop(self.grid, x, y, dir)
+    local stopCol, stopRow = findIceballStop(self.grid, x, y, dir)
     local sx, sy = self.grid:gridToScreen(x, y)
     local tx, ty = self.grid:gridToScreen(stopCol, stopRow)
     sx = sx + self.grid.tileSize / 2

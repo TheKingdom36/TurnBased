@@ -83,10 +83,6 @@ function TurnManager:getTurnProgress()
     return self.turnTimer / self.turnDuration
 end
 
-function TurnManager:isTurnWarning()
-    return self.turnTimer >= (self.turnDuration - self.turnWarningTime)
-end
-
 function TurnManager:setTurnDuration(duration)
     self.turnDuration = duration
 end

@@ -33,6 +33,7 @@ function Player:new(col, row , name, stats)
     player.animTime = 0
     player.animSpeed = 0.15 -- seconds per tile
     player.attacks = {}
+    player.bones = {}
     setmetatable(player, self)
     return player
 end

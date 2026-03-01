@@ -68,5 +68,8 @@ function Enemy:attack(target)
     end
 end
 
+function Enemy:takeTurn()
+    
+end
 
 return Enemy
